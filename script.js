@@ -372,7 +372,6 @@ function deleteSubject(subjectName) {
 
   saveSubjects();
   renderAll();
-updateHomeScreen();
 }
 
 function renderCalendar() {
