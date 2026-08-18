@@ -1054,8 +1054,8 @@ function applyTheme() {
   );
 
   themeBtn.textContent = isDarkMode
-    ? "☀️ 明るくする"
-    : "🌙 ダーク";
+    ? "☀️ ライトモード"
+    : "🌙 ダークモード";
 }
 
 exportJsonBtn.addEventListener("click", () => {
