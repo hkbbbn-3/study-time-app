@@ -416,6 +416,8 @@ function renderHome(){
   const subjEntries = Object.entries(bySubject).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const maxSubj = subjEntries.length ? subjEntries[0][1] : 1;
 
+  const allTime = computeAllTimeStats();
+
   return `
     <div class="hero ${achieved ? 'hero-achieved' : ''}">
       ${achieved ? `<div class="confetti" id="confetti"></div>` : ''}
@@ -498,7 +500,34 @@ function renderHome(){
         <div class="bar-track" style="height:6px; margin-bottom:2px;"><div class="bar-fill" style="width:${w}%; background:${s.color}"></div></div>`;
       }).join('') : `<div class="empty">まだ記録がありません<br>「記録」タブから始めてみよう</div>`}
     </div>
+
+    <div class="card">
+      <div class="card-title icon-row">${icon('trending',15)} これまでの記録</div>
+      <div class="alltime-stats">
+        <div class="alltime-stat">
+          <div class="v">${fmtMin(allTime.totalMinutes)}</div>
+          <div class="l">累計時間</div>
+        </div>
+        <div class="alltime-stat">
+          <div class="v">${allTime.dayCount}日</div>
+          <div class="l">記録日数</div>
+        </div>
+        <div class="alltime-stat">
+          <div class="v">${allTime.firstDateLabel}</div>
+          <div class="l">はじめた日</div>
+        </div>
+      </div>
+    </div>
   `;
+}
+
+function computeAllTimeStats(){
+  if(state.records.length===0) return { totalMinutes:0, dayCount:0, firstDateLabel:'―' };
+  const totalMinutes = state.records.reduce((a,r)=>a+r.minutes,0);
+  const dayCount = new Set(state.records.map(r=>r.date)).size;
+  const firstDate = state.records.reduce((min,r)=> r.date<min?r.date:min, state.records[0].date);
+  const d = isoToDate(firstDate);
+  return { totalMinutes, dayCount, firstDateLabel: `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日` };
 }
 
 // ---------- CALENDAR ----------
