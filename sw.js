@@ -1,4 +1,4 @@
-const CACHE_NAME = 'study-time-v3';
+const CACHE_NAME = 'study-time-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -27,16 +27,16 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  // Network-first: always try to fetch the latest version, and only fall back to the
+  // cache when offline. (A cache-first strategy here would keep serving whatever was
+  // cached on first install forever, even after the app's files are updated.)
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
-          return res;
-        })
-        .catch(() => cached);
-    })
+    fetch(event.request)
+      .then((res) => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

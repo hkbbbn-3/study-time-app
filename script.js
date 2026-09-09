@@ -29,6 +29,7 @@ const ICON_PATHS = {
   arrowUp: '<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>',
   arrowDown: '<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>',
   minus: '<path d="M5 12h14"/>',
+  warning: '<path d="M12 3.5 21.5 20h-19Z"/><path d="M12 9.5v5"/><circle cx="12" cy="17.3" r="0.9" fill="currentColor" stroke="none"/>',
 };
 function icon(name, size=18, extraClass=''){
   const inner = ICON_PATHS[name] || '';
@@ -61,6 +62,9 @@ let ui = {
   calMonth: new Date().getMonth(),
   selectedDate: isoToday(),
   form: { date: isoToday(), subjectId: null, hours: 1, minutes: 0, memo: '', editingId: null },
+  confirm: null, // { title, desc, actionType, actionId }
+  datePicker: null, // { year, month } when open (for the record form's date field)
+  subjectEditor: null, // { id, name, color } when editing a subject
 };
 
 function isoToday(){ return dateToISO(new Date()); }
@@ -181,7 +185,7 @@ function render(){
             <div class="brand-sub">積み上げが、力になる</div>
           </div>
         </div>
-        <div class="iconbtn" data-action="toggle-theme">${state.theme==='dark' ? icon('sun',17) : icon('moon',17)}</div>
+        <div class="iconbtn" data-action="toggle-theme" role="button" tabindex="0">${state.theme==='dark' ? icon('sun',17) : icon('moon',17)}</div>
       </div>
       <div class="content fade-in" id="content"></div>
       <div class="tabbar">
@@ -192,9 +196,114 @@ function render(){
         ${tabBtn('settings', icon('sliders',19), '設定')}
       </div>
     </div>
+    ${ui.confirm ? renderConfirmModal() : ''}
+    ${ui.datePicker ? renderDatePicker() : ''}
+    ${ui.subjectEditor ? renderSubjectEditor() : ''}
   `;
   document.getElementById('content').innerHTML = renderPage();
   bindEvents();
+}
+
+function openDatePicker(){
+  const d = isoToDate(ui.form.date);
+  ui.datePicker = { year: d.getFullYear(), month: d.getMonth() };
+  render();
+}
+
+function renderDatePicker(){
+  const dp = ui.datePicker;
+  const y = dp.year, m = dp.month;
+  const first = new Date(y,m,1);
+  const startOffset = (first.getDay()+6)%7; // Monday-start
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const todayIso = isoToday();
+  const selIso = ui.form.date;
+
+  let cells = '';
+  const totalCells = Math.ceil((startOffset+daysInMonth)/7)*7;
+  for(let i=0;i<totalCells;i++){
+    const dayNum = i - startOffset + 1;
+    if(dayNum<1 || dayNum>daysInMonth){
+      cells += `<div class="day-cell muted"></div>`;
+      continue;
+    }
+    const iso = dateToISO(new Date(y,m,dayNum));
+    const isToday = iso===todayIso;
+    const isSel = iso===selIso;
+    cells += `
+      <div class="day-cell ${isToday?'today':''} ${isSel?'selected':''}" data-action="dp-select-day" data-date="${iso}" role="button" tabindex="0">
+        <div class="day-num">${dayNum}</div>
+      </div>`;
+  }
+
+  return `
+    <div class="modal-overlay" data-action="cancel-date-picker">
+      <div class="modal-box dp-box" data-action="stop">
+        <div class="cal-head">
+          <div class="cal-title">${y}年 ${m+1}月</div>
+          <div class="cal-nav">
+            <div class="iconbtn" data-action="dp-prev-month" role="button" tabindex="0">${icon('chevronLeft',16)}</div>
+            <div class="iconbtn" data-action="dp-next-month" role="button" tabindex="0">${icon('chevronRight',16)}</div>
+          </div>
+        </div>
+        <div class="weekday-row">${WEEKDAY_LABELS.map(w=>`<div>${w}</div>`).join('')}</div>
+        <div class="cal-grid">${cells}</div>
+      </div>
+    </div>
+  `;
+}
+
+function openSubjectEditor(id){
+  const s = subjectById(id);
+  ui.subjectEditor = { id, name: s.name, color: s.color };
+  render();
+}
+
+function renderSubjectEditor(){
+  const se = ui.subjectEditor;
+  return `
+    <div class="modal-overlay" data-action="cancel-subject-edit">
+      <div class="modal-box" data-action="stop">
+        <div class="modal-title">科目を編集</div>
+        <div class="field" style="text-align:left; margin-top:16px;">
+          <label class="field-label">科目名</label>
+          <input class="input" type="text" data-field="subject-edit-name" value="${escapeHtml(se.name)}">
+        </div>
+        <div class="field" style="text-align:left;">
+          <label class="field-label">色</label>
+          <div class="color-swatches">
+            ${SUBJECT_PALETTE.map(c=>`<div class="color-swatch ${c===se.color?'selected':''}" style="background:${c}" data-action="pick-subject-color" data-color="${c}" role="button" tabindex="0" aria-label="この色にする"></div>`).join('')}
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn cancel" data-action="cancel-subject-edit">キャンセル</button>
+          <button class="modal-btn primary" data-action="save-subject-edit">保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderConfirmModal(){
+  const c = ui.confirm;
+  return `
+    <div class="modal-overlay" data-action="cancel-confirm">
+      <div class="modal-box" data-action="stop">
+        <div class="modal-icon">${icon('warning',24)}</div>
+        <div class="modal-title">${escapeHtml(c.title)}</div>
+        <div class="modal-desc">${escapeHtml(c.desc)}</div>
+        <div class="modal-actions">
+          <button class="modal-btn cancel" data-action="cancel-confirm">キャンセル</button>
+          <button class="modal-btn danger" data-action="confirm-delete">${escapeHtml(c.confirmLabel || '削除する')}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function openConfirm(title, desc, actionType, actionId, confirmLabel){
+  ui.confirm = { title, desc, actionType, actionId, confirmLabel };
+  render();
 }
 
 function tabBtn(key,icon,label){
@@ -392,7 +501,7 @@ function renderCalendar(){
     const isToday = iso===todayIso;
     const isSel = iso===ui.selectedDate;
     cells += `
-      <div class="day-cell ${isToday?'today':''} ${isSel?'selected':''}" data-action="select-day" data-date="${iso}">
+      <div class="day-cell ${isToday?'today':''} ${isSel?'selected':''}" data-action="select-day" data-date="${iso}" role="button" tabindex="0">
         ${achieved?`<div class="day-check">${icon('check',9)}</div>`:''}
         <div class="day-num">${dayNum}</div>
         <div class="day-dots">${uniqueSubs.map(sid=>`<span style="background:${subjectById(sid).color}"></span>`).join('')}</div>
@@ -409,8 +518,8 @@ function renderCalendar(){
       <div class="cal-head">
         <div class="cal-title">${y}年 ${m+1}月</div>
         <div class="cal-nav">
-          <div class="iconbtn" data-action="prev-month">${icon('chevronLeft',16)}</div>
-          <div class="iconbtn" data-action="next-month">${icon('chevronRight',16)}</div>
+          <div class="iconbtn" data-action="prev-month" role="button" tabindex="0">${icon('chevronLeft',16)}</div>
+          <div class="iconbtn" data-action="next-month" role="button" tabindex="0">${icon('chevronRight',16)}</div>
         </div>
       </div>
       <div class="weekday-row">${WEEKDAY_LABELS.map(w=>`<div>${w}</div>`).join('')}</div>
@@ -460,7 +569,10 @@ function renderRecord(){
 
       <div class="field">
         <label class="field-label">日付</label>
-        <input class="input" type="date" value="${f.date}" data-field="date">
+        <div class="date-field icon-row" data-action="open-date-picker" role="button" tabindex="0">
+          <span>${formatDateFull(f.date)}</span>
+          ${icon('calendar',16)}
+        </div>
       </div>
 
       <div class="field">
@@ -511,6 +623,10 @@ function formatDateJp(iso){
   const d = isoToDate(iso);
   return `${d.getMonth()+1}月${d.getDate()}日`;
 }
+function formatDateFull(iso){
+  const d = isoToDate(iso);
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`;
+}
 
 // ---------- SETTINGS ----------
 function renderSettings(){
@@ -524,7 +640,7 @@ function renderSettings(){
     <div class="card">
       <div class="toggle-row">
         <div class="t icon-row" style="justify-content:flex-start">${icon('moon',16)} ダークモード</div>
-        <div class="switch ${state.theme==='dark'?'on':''}" data-action="toggle-theme-switch"><div class="knob"></div></div>
+        <div class="switch ${state.theme==='dark'?'on':''}" data-action="toggle-theme-switch" role="switch" aria-checked="${state.theme==='dark'}" tabindex="0"><div class="knob"></div></div>
       </div>
     </div>
 
@@ -550,6 +666,7 @@ function renderSettings(){
         <div class="subject-chip">
           <div class="dot" style="background:${s.color}"></div>
           <div class="name">${escapeHtml(s.name)}</div>
+          <button data-action="edit-subject" data-id="${s.id}">${icon('edit',13)}</button>
           <button data-action="delete-subject" data-id="${s.id}">${icon('x',13)}</button>
         </div>
       `).join('')}
@@ -575,11 +692,20 @@ function escapeHtml(str){
 
 // ---------- events ----------
 function bindEvents(){
-  const root = document.querySelector('.phone');
+  const root = document.getElementById('canvas');
   if(!root) return;
 
   root.addEventListener('click', onClick);
   root.addEventListener('change', onChange);
+  root.addEventListener('keydown', onKeydown);
+}
+
+function onKeydown(e){
+  if(e.key !== 'Enter' && e.key !== ' ') return;
+  const btn = e.target.closest('[role="button"], [role="switch"]');
+  if(!btn) return;
+  e.preventDefault();
+  btn.click();
 }
 
 function onClick(e){
@@ -634,16 +760,84 @@ function onClick(e){
     return;
   }
   if(action==='delete-record'){
-    state.records = state.records.filter(r=>r.id!==btn.dataset.id);
-    persist();
-    showToast('記録を削除しました');
-    render(); return;
+    openConfirm('この記録を削除しますか？', 'この操作は取り消せません。', 'record', btn.dataset.id);
+    return;
   }
   if(action==='delete-subject'){
     if(state.subjects.length<=1){ showToast('最後の科目は削除できません'); return; }
-    state.subjects = state.subjects.filter(s=>s.id!==btn.dataset.id);
-    if(ui.form.subjectId===btn.dataset.id) ui.form.subjectId = state.subjects[0].id;
-    persist();
+    const s = subjectById(btn.dataset.id);
+    openConfirm(`「${s.name}」を削除しますか？`, 'この科目に関連する記録は削除されません。', 'subject', btn.dataset.id);
+    return;
+  }
+  if(action==='edit-subject'){
+    openSubjectEditor(btn.dataset.id); return;
+  }
+  if(action==='cancel-subject-edit'){
+    ui.subjectEditor = null;
+    render(); return;
+  }
+  if(action==='pick-subject-color'){
+    ui.subjectEditor.color = btn.dataset.color;
+    render(); return;
+  }
+  if(action==='save-subject-edit'){
+    const se = ui.subjectEditor;
+    const name = se.name.trim();
+    if(!name){ showToast('科目名を入力してください'); return; }
+    const s = state.subjects.find(s=>s.id===se.id);
+    if(s){ s.name = name; s.color = se.color; persist(); showToast('科目を更新しました'); }
+    ui.subjectEditor = null;
+    render(); return;
+  }
+  if(action==='open-date-picker'){
+    openDatePicker(); return;
+  }
+  if(action==='cancel-date-picker'){
+    ui.datePicker = null;
+    render(); return;
+  }
+  if(action==='dp-prev-month'){
+    ui.datePicker.month--; if(ui.datePicker.month<0){ ui.datePicker.month=11; ui.datePicker.year--; }
+    render(); return;
+  }
+  if(action==='dp-next-month'){
+    ui.datePicker.month++; if(ui.datePicker.month>11){ ui.datePicker.month=0; ui.datePicker.year++; }
+    render(); return;
+  }
+  if(action==='dp-select-day'){
+    ui.form.date = btn.dataset.date;
+    ui.datePicker = null;
+    render(); return;
+  }
+  if(action==='cancel-confirm'){
+    ui.confirm = null;
+    pendingImport = null;
+    resetImportInput();
+    render(); return;
+  }
+  if(action==='confirm-delete'){
+    const c = ui.confirm;
+    if(c && c.actionType==='record'){
+      state.records = state.records.filter(r=>r.id!==c.actionId);
+      persist();
+      showToast('記録を削除しました');
+    } else if(c && c.actionType==='subject'){
+      state.subjects = state.subjects.filter(s=>s.id!==c.actionId);
+      if(ui.form.subjectId===c.actionId) ui.form.subjectId = state.subjects[0] ? state.subjects[0].id : null;
+      persist();
+      showToast('科目を削除しました');
+    } else if(c && c.actionType==='import' && pendingImport){
+      const result = pendingImport;
+      state.subjects = result.subjects;
+      state.records = result.records;
+      state.goals = result.goals;
+      if(result.theme){ state.theme = result.theme; applyTheme(); }
+      persist();
+      showToast(`${result.records.length}件の記録を読み込みました`);
+    }
+    pendingImport = null;
+    resetImportInput();
+    ui.confirm = null;
     render(); return;
   }
   if(action==='add-subject'){
@@ -671,11 +865,11 @@ function onChange(e){
   const field = e.target.dataset.field;
   if(!field) return;
 
-  if(field==='date'){ ui.form.date = e.target.value; render(); return; }
   if(field==='subjectId'){ ui.form.subjectId = e.target.value; return; }
   if(field==='hours'){ ui.form.hours = Number(e.target.value); syncSubmitState(); return; }
   if(field==='minutes'){ ui.form.minutes = Number(e.target.value); syncSubmitState(); return; }
   if(field==='memo'){ ui.form.memo = e.target.value; return; }
+  if(field==='subject-edit-name'){ ui.subjectEditor.name = e.target.value; return; }
 }
 
 function syncSubmitState(){
@@ -744,6 +938,13 @@ function downloadBlob(content, filename, type){
   URL.revokeObjectURL(url);
 }
 
+let pendingImport = null;
+
+function resetImportInput(){
+  const el = document.getElementById('import-file');
+  if(el) el.value = '';
+}
+
 function handleImport(file){
   if(!file) return;
   const reader = new FileReader();
@@ -754,17 +955,18 @@ function handleImport(file){
       if(!result.ok){
         showToast('この形式は読み込めませんでした');
         console.warn('import failed, raw data:', parsed);
+        resetImportInput();
         return;
       }
-      state.subjects = result.subjects;
-      state.records = result.records;
-      state.goals = result.goals;
-      if(result.theme){ state.theme = result.theme; applyTheme(); }
-      persist();
-      showToast(`${result.records.length}件の記録を読み込みました`);
-      render();
+      pendingImport = result;
+      openConfirm(
+        'バックアップを読み込みますか？',
+        `現在のデータは上書きされます（${result.records.length}件の記録を読み込みます）。この操作は取り消せません。`,
+        'import', null, '読み込む'
+      );
     }catch(err){
       showToast('ファイルの読み込みに失敗しました');
+      resetImportInput();
     }
   };
   reader.readAsText(file);
