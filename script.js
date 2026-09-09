@@ -54,6 +54,7 @@ let state = {
   records: [], // {id,date,subjectId,minutes,memo}
   goals: { weekday: 120, weekend: 240 },
   theme: 'light',
+  lastMemo: '', // pre-fills the memo field for the next new record
 };
 
 let ui = {
@@ -63,7 +64,7 @@ let ui = {
   homeYear: new Date().getFullYear(),
   homeMonth: new Date().getMonth(),
   selectedDate: isoToday(),
-  form: { date: isoToday(), subjectId: null, hours: 1, minutes: 0, memo: '', editingId: null },
+  form: { date: isoToday(), subjectIds: [], hours: 1, minutes: 0, memo: '', editingId: null },
   confirm: null, // { title, desc, actionType, actionId }
   datePicker: null, // { year, month } when open (for the record form's date field)
   subjectEditor: null, // { id, name, color } when editing a subject
@@ -101,7 +102,7 @@ function persist(){
   saveTimer=setTimeout(()=>{
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme
+        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, lastMemo: state.lastMemo
       }));
     }catch(e){ console.error('save failed', e); showToast('保存に失敗しました'); }
   }, 150);
@@ -116,12 +117,14 @@ async function loadData(){
       if(parsed.records) state.records = parsed.records;
       if(parsed.goals) state.goals = parsed.goals;
       if(parsed.theme) state.theme = parsed.theme;
+      if(parsed.lastMemo) state.lastMemo = parsed.lastMemo;
     }
   }catch(e){
     // no existing data yet, or storage unavailable — use defaults
   }
   applyTheme();
-  ui.form.subjectId = state.subjects[0] ? state.subjects[0].id : null;
+  ui.form.subjectIds = state.subjects[0] ? [state.subjects[0].id] : [];
+  ui.form.memo = state.lastMemo || '';
 }
 
 function applyTheme(){
@@ -640,11 +643,14 @@ function renderRecord(){
       </div>
 
       <div class="field">
-        <label class="field-label">科目</label>
-        <div class="select-wrap">
-          <select data-field="subjectId">
-            ${state.subjects.map(s=>`<option value="${s.id}" ${s.id===f.subjectId?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
-          </select>
+        <label class="field-label">科目${isEditing?'':'（複数選択可）'}</label>
+        <div class="subject-pill-grid">
+          ${state.subjects.map(s=>{
+            const selected = f.subjectIds.includes(s.id);
+            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-subject-select" data-id="${s.id}" style="${selected?`background:${s.color};border-color:${s.color};`:''}">
+              <span class="dot" style="background:${selected?'#fff':s.color}"></span>${escapeHtml(s.name)}
+            </button>`;
+          }).join('')}
         </div>
       </div>
 
@@ -672,8 +678,8 @@ function renderRecord(){
         <textarea data-field="memo" placeholder="やったことを一言メモ...">${escapeHtml(f.memo)}</textarea>
       </div>
 
-      <button class="submit-btn icon-row" data-action="submit-record" ${(f.hours===0 && f.minutes===0)?'disabled':''}>
-        ${isEditing ? icon('check',15)+' 更新する' : icon('plus',15)+' 記録する'}
+      <button class="submit-btn icon-row" data-action="submit-record" ${(f.hours===0 && f.minutes===0) || f.subjectIds.length===0 ?'disabled':''}>
+        ${isEditing ? icon('check',15)+' 更新する' : (f.subjectIds.length>1 ? icon('plus',15)+` ${f.subjectIds.length}件を記録する` : icon('plus',15)+' 記録する')}
       </button>
       ${isEditing ? `<div class="cancel-link" data-action="cancel-edit">編集をやめる</div>` : ''}
     </div>
@@ -852,7 +858,7 @@ function onClick(e){
   if(action==='edit-record'){
     const rec = state.records.find(r=>r.id===btn.dataset.id);
     if(rec){
-      ui.form = { date:rec.date, subjectId:rec.subjectId, hours:Math.floor(rec.minutes/60), minutes:rec.minutes%60, memo:rec.memo||'', editingId:rec.id };
+      ui.form = { date:rec.date, subjectIds:[rec.subjectId], hours:Math.floor(rec.minutes/60), minutes:rec.minutes%60, memo:rec.memo||'', editingId:rec.id };
       window.scrollTo(0,0);
       render();
     }
@@ -903,6 +909,18 @@ function onClick(e){
     ui.subjectEditor = null;
     render(); return;
   }
+  if(action==='toggle-subject-select'){
+    const id = btn.dataset.id;
+    if(ui.form.editingId){
+      // editing an existing record: a single subject only, clicking just replaces it
+      ui.form.subjectIds = [id];
+    } else if(ui.form.subjectIds.includes(id)){
+      if(ui.form.subjectIds.length>1) ui.form.subjectIds = ui.form.subjectIds.filter(x=>x!==id);
+    } else {
+      ui.form.subjectIds = [...ui.form.subjectIds, id];
+    }
+    render(); return;
+  }
   if(action==='open-date-picker'){
     openDatePicker(); return;
   }
@@ -933,7 +951,8 @@ function onClick(e){
       showToast('記録を削除しました');
     } else if(c && c.actionType==='subject'){
       state.subjects = state.subjects.filter(s=>s.id!==c.actionId);
-      if(ui.form.subjectId===c.actionId) ui.form.subjectId = state.subjects[0] ? state.subjects[0].id : null;
+      ui.form.subjectIds = ui.form.subjectIds.filter(id=>id!==c.actionId);
+      if(ui.form.subjectIds.length===0) ui.form.subjectIds = state.subjects[0] ? [state.subjects[0].id] : [];
       persist();
       showToast('科目を削除しました');
     } else if(c && c.actionType==='import' && pendingImport){
@@ -985,7 +1004,6 @@ function onChange(e){
   const field = e.target.dataset.field;
   if(!field) return;
 
-  if(field==='subjectId'){ ui.form.subjectId = e.target.value; return; }
   if(field==='hours'){ ui.form.hours = Number(e.target.value); syncSubmitState(); return; }
   if(field==='minutes'){ ui.form.minutes = Number(e.target.value); syncSubmitState(); return; }
   if(field==='memo'){ ui.form.memo = e.target.value; return; }
@@ -994,22 +1012,25 @@ function onChange(e){
 
 function syncSubmitState(){
   const btn = document.querySelector('[data-action="submit-record"]');
-  if(btn) btn.disabled = (ui.form.hours===0 && ui.form.minutes===0);
+  if(btn) btn.disabled = (ui.form.hours===0 && ui.form.minutes===0) || ui.form.subjectIds.length===0;
 }
 
 function submitRecord(){
   const f = ui.form;
   const minutes = f.hours*60 + f.minutes;
-  if(minutes<=0 || !f.subjectId) return;
+  if(minutes<=0 || f.subjectIds.length===0) return;
 
   if(f.editingId){
     const rec = state.records.find(r=>r.id===f.editingId);
-    if(rec){ rec.date=f.date; rec.subjectId=f.subjectId; rec.minutes=minutes; rec.memo=f.memo; }
+    if(rec){ rec.date=f.date; rec.subjectId=f.subjectIds[0]; rec.minutes=minutes; rec.memo=f.memo; }
     showToast('記録を更新しました');
   } else {
-    state.records.push({ id: uid(), date:f.date, subjectId:f.subjectId, minutes, memo:f.memo });
-    showToast('記録しました');
+    f.subjectIds.forEach(subjectId=>{
+      state.records.push({ id: uid(), date:f.date, subjectId, minutes, memo:f.memo });
+    });
+    showToast(f.subjectIds.length>1 ? `${f.subjectIds.length}件の記録をしました` : '記録しました');
   }
+  state.lastMemo = f.memo;
   persist();
   const wasGoalAchieved = goalFor(f.date)>0 && totalOn(f.date) >= goalFor(f.date);
   resetForm(f.date);
@@ -1020,7 +1041,7 @@ function submitRecord(){
 }
 
 function resetForm(keepDate){
-  ui.form = { date: keepDate || isoToday(), subjectId: state.subjects[0] ? state.subjects[0].id : null, hours:1, minutes:0, memo:'', editingId:null };
+  ui.form = { date: keepDate || isoToday(), subjectIds: state.subjects[0] ? [state.subjects[0].id] : [], hours:1, minutes:0, memo:state.lastMemo||'', editingId:null };
 }
 
 function saveGoalsFromForm(){
