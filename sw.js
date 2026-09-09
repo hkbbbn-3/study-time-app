@@ -1,4 +1,4 @@
-const CACHE_NAME = 'study-time-v4';
+const CACHE_NAME = 'study-time-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -6,7 +6,10 @@ const ASSETS = [
   './script.js',
   './manifest.json',
   './icon-192.png',
+  './icon-192-maskable.png',
   './icon-512.png',
+  './icon-512-maskable.png',
+  './apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (event) => {
