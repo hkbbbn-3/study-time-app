@@ -491,8 +491,8 @@ function renderHome(){
         </div>
       </div>
       <div class="progress-row">
-        <div class="t">月の合計</div>
-        <div class="n">${fmtMin(monthTotal)} / ${fmtMin(monthGoal)}</div>
+        <div class="t">月の記録</div>
+        <div class="n">${fmtMin(monthTotal)}（目標 ${fmtMin(monthGoal)}）</div>
       </div>
       <div class="bar-track"><div class="bar-fill" style="width:${monthPct}%"></div></div>
     </div>
@@ -1151,6 +1151,10 @@ function handleCsvImport(file){
       state.subjects.forEach(s=>{ nameToId[s.name] = s.id; });
       const newSubjects = [];
       const newRecords = [];
+      let skippedDupeCount = 0;
+      const isDuplicate = (date, subjectId, minutes, memo) =>
+        state.records.some(r => r.date===date && r.subjectId===subjectId && r.minutes===minutes && (r.memo||'')===memo) ||
+        newRecords.some(r => r.date===date && r.subjectId===subjectId && r.minutes===minutes && (r.memo||'')===memo);
       for(let i=1; i<rows.length; i++){
         const r = rows[i];
         const date = normalizeDate(r[dateIdx]);
@@ -1164,18 +1168,20 @@ function handleCsvImport(file){
           const color = SUBJECT_PALETTE[(state.subjects.length + newSubjects.length) % SUBJECT_PALETTE.length];
           newSubjects.push({ id: subjectId, name: subjName, color });
         }
-        newRecords.push({ id: uid(), date, subjectId, minutes, memo: memoIdx>=0 ? (r[memoIdx]||'') : '' });
+        const memo = memoIdx>=0 ? (r[memoIdx]||'') : '';
+        if(isDuplicate(date, subjectId, minutes, memo)){ skippedDupeCount++; continue; }
+        newRecords.push({ id: uid(), date, subjectId, minutes, memo });
       }
 
       if(newRecords.length===0){
-        showToast('この形式は読み込めませんでした');
+        showToast(skippedDupeCount>0 ? '追加できる記録がありませんでした（すべて既存の記録と重複していました）' : 'この形式は読み込めませんでした');
         resetCsvImportInput();
         return;
       }
-      pendingCsvImport = { records: newRecords, newSubjects };
+      pendingCsvImport = { records: newRecords, newSubjects, skippedDupeCount };
       openConfirm(
         'CSVから記録を追加しますか？',
-        `${newRecords.length}件の記録を追加します${newSubjects.length>0?`（新しい科目${newSubjects.length}件を追加）`:''}。この操作は取り消せません。`,
+        `${newRecords.length}件の記録を追加します${newSubjects.length>0?`（新しい科目${newSubjects.length}件を追加）`:''}${skippedDupeCount>0?`（既存と重複する${skippedDupeCount}件はスキップされます）`:''}。この操作は取り消せません。`,
         'import-csv', null, '追加する'
       );
     }catch(err){
