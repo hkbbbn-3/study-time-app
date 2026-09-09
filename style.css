@@ -374,8 +374,11 @@ textarea{resize:none; font-weight:500; min-height:70px; font-family:inherit;}
   display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:14px; background:var(--surface); border:1px solid var(--line); margin-bottom:8px;
 }
 .subject-chip .dot{width:12px;height:12px;border-radius:5px; flex-shrink:0;}
-.subject-chip .name{flex:1; font-size:13px; font-weight:700; color:var(--ink);}
-.subject-chip button{border:none; background:none; color:var(--ink-faint); font-size:13px; cursor:pointer; width:24px; height:24px; display:flex; align-items:center; justify-content:center;}
+.subject-chip .name{flex:1; min-width:0; font-size:13px; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.subject-chip button{border:none; background:none; color:var(--ink-faint); font-size:13px; cursor:pointer; width:24px; height:24px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.subject-chip button:disabled{opacity:.25; cursor:default;}
+.reorder-btns{display:flex; flex-direction:column; flex-shrink:0;}
+.reorder-btns button{width:18px; height:14px;}
 .add-subject-row{display:flex; gap:8px; margin-top:10px;}
 .add-subject-row input{flex:1;}
 .add-subject-row button{

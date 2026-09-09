@@ -206,7 +206,14 @@ function render(){
 }
 
 function closeAnyModal(){
-  if(ui.confirm){ ui.confirm = null; pendingImport = null; resetImportInput(); render(); return true; }
+  if(ui.confirm){
+    ui.confirm = null;
+    pendingImport = null;
+    pendingCsvImport = null;
+    resetImportInput();
+    resetCsvImportInput();
+    render(); return true;
+  }
   if(ui.datePicker){ ui.datePicker = null; render(); return true; }
   if(ui.subjectEditor){ ui.subjectEditor = null; render(); return true; }
   return false;
@@ -680,10 +687,14 @@ function renderSettings(){
 
     <div class="section-label icon-row" style="justify-content:flex-start">${icon('book',13)} 科目の設定</div>
     <div class="card">
-      ${state.subjects.map(s=>`
+      ${state.subjects.map((s,idx)=>`
         <div class="subject-chip">
           <div class="dot" style="background:${s.color}"></div>
           <div class="name">${escapeHtml(s.name)}</div>
+          <div class="reorder-btns">
+            <button data-action="move-subject-up" data-id="${s.id}" aria-label="「${escapeHtml(s.name)}」を上に移動" ${idx===0?'disabled':''}>${icon('arrowUp',12)}</button>
+            <button data-action="move-subject-down" data-id="${s.id}" aria-label="「${escapeHtml(s.name)}」を下に移動" ${idx===state.subjects.length-1?'disabled':''}>${icon('arrowDown',12)}</button>
+          </div>
           <button data-action="edit-subject" data-id="${s.id}" aria-label="「${escapeHtml(s.name)}」を編集">${icon('edit',13)}</button>
           <button data-action="delete-subject" data-id="${s.id}" aria-label="「${escapeHtml(s.name)}」を削除">${icon('x',13)}</button>
         </div>
@@ -703,7 +714,9 @@ function renderSettings(){
       <button class="ghost-btn" data-action="export-json">${icon('archive',15)} バックアップを書き出す</button>
       <button class="ghost-btn" data-action="export-csv">${icon('file',15)} CSVを書き出す</button>
       <button class="ghost-btn" data-action="trigger-import">${icon('upload',15)} バックアップを読み込む</button>
+      <button class="ghost-btn" data-action="trigger-csv-import">${icon('upload',15)} CSVを読み込む</button>
       <input type="file" id="import-file" class="file-input" accept="application/json">
+      <input type="file" id="import-csv-file" class="file-input" accept=".csv,text/csv">
     </div>
   `;
 }
@@ -811,6 +824,22 @@ function onClick(e){
   if(action==='edit-subject'){
     openSubjectEditor(btn.dataset.id); return;
   }
+  if(action==='move-subject-up'){
+    const idx = state.subjects.findIndex(s=>s.id===btn.dataset.id);
+    if(idx>0){
+      [state.subjects[idx-1], state.subjects[idx]] = [state.subjects[idx], state.subjects[idx-1]];
+      persist();
+    }
+    render(); return;
+  }
+  if(action==='move-subject-down'){
+    const idx = state.subjects.findIndex(s=>s.id===btn.dataset.id);
+    if(idx>=0 && idx<state.subjects.length-1){
+      [state.subjects[idx], state.subjects[idx+1]] = [state.subjects[idx+1], state.subjects[idx]];
+      persist();
+    }
+    render(); return;
+  }
   if(action==='cancel-subject-edit'){
     closeAnyModal(); return;
   }
@@ -868,9 +897,17 @@ function onClick(e){
       if(result.theme){ state.theme = result.theme; applyTheme(); }
       persist();
       showToast(`${result.records.length}件の記録を読み込みました`);
+    } else if(c && c.actionType==='import-csv' && pendingCsvImport){
+      const { records, newSubjects } = pendingCsvImport;
+      state.subjects = state.subjects.concat(newSubjects);
+      state.records = state.records.concat(records);
+      persist();
+      showToast(`${records.length}件の記録を追加しました`);
     }
     pendingImport = null;
+    pendingCsvImport = null;
     resetImportInput();
+    resetCsvImportInput();
     ui.confirm = null;
     render(); return;
   }
@@ -891,10 +928,12 @@ function onClick(e){
   if(action==='export-json'){ exportJson(); return; }
   if(action==='export-csv'){ exportCsv(); return; }
   if(action==='trigger-import'){ document.getElementById('import-file').click(); return; }
+  if(action==='trigger-csv-import'){ document.getElementById('import-csv-file').click(); return; }
 }
 
 function onChange(e){
   if(e.target.id==='import-file'){ handleImport(e.target.files[0]); return; }
+  if(e.target.id==='import-csv-file'){ handleCsvImport(e.target.files[0]); return; }
 
   const field = e.target.dataset.field;
   if(!field) return;
@@ -1001,6 +1040,100 @@ function handleImport(file){
     }catch(err){
       showToast('ファイルの読み込みに失敗しました');
       resetImportInput();
+    }
+  };
+  reader.readAsText(file);
+}
+
+let pendingCsvImport = null;
+
+function resetCsvImportInput(){
+  const el = document.getElementById('import-csv-file');
+  if(el) el.value = '';
+}
+
+// Parses RFC4180-ish CSV text (quoted fields, "" escaping, either \n or \r\n).
+function parseCsv(text){
+  if(text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for(let i=0; i<text.length; i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else if(c === '"'){
+      inQuotes = true;
+    } else if(c === ','){
+      row.push(field); field = '';
+    } else if(c === '\n' || c === '\r'){
+      if(c === '\r' && text[i+1] === '\n') i++;
+      row.push(field); field = '';
+      rows.push(row); row = [];
+    } else {
+      field += c;
+    }
+  }
+  if(field.length>0 || row.length>0){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+// CSV import is additive (adds records to what's already there) rather than a full
+// backup restore, since a CSV only ever has records — not subjects/goals/theme.
+function handleCsvImport(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const rows = parseCsv(e.target.result).filter(r => r.length>1 || r[0]!=='');
+      if(rows.length < 2){ showToast('この形式は読み込めませんでした'); resetCsvImportInput(); return; }
+      const header = rows[0].map(h=>String(h).trim().toLowerCase());
+      const dateIdx = header.indexOf('date');
+      const subjectIdx = header.indexOf('subject');
+      const minutesIdx = header.indexOf('minutes');
+      const memoIdx = header.indexOf('memo');
+      if(dateIdx<0 || subjectIdx<0 || minutesIdx<0){
+        showToast('この形式は読み込めませんでした');
+        resetCsvImportInput();
+        return;
+      }
+
+      const nameToId = {};
+      state.subjects.forEach(s=>{ nameToId[s.name] = s.id; });
+      const newSubjects = [];
+      const newRecords = [];
+      for(let i=1; i<rows.length; i++){
+        const r = rows[i];
+        const date = normalizeDate(r[dateIdx]);
+        const minutes = Number(r[minutesIdx]);
+        const subjName = (r[subjectIdx]||'').trim();
+        if(!date || !minutes || minutes<=0 || !subjName) continue;
+        let subjectId = nameToId[subjName];
+        if(!subjectId){
+          subjectId = uid();
+          nameToId[subjName] = subjectId;
+          const color = SUBJECT_PALETTE[(state.subjects.length + newSubjects.length) % SUBJECT_PALETTE.length];
+          newSubjects.push({ id: subjectId, name: subjName, color });
+        }
+        newRecords.push({ id: uid(), date, subjectId, minutes, memo: memoIdx>=0 ? (r[memoIdx]||'') : '' });
+      }
+
+      if(newRecords.length===0){
+        showToast('この形式は読み込めませんでした');
+        resetCsvImportInput();
+        return;
+      }
+      pendingCsvImport = { records: newRecords, newSubjects };
+      openConfirm(
+        'CSVから記録を追加しますか？',
+        `${newRecords.length}件の記録を追加します${newSubjects.length>0?`（新しい科目${newSubjects.length}件を追加）`:''}。この操作は取り消せません。`,
+        'import-csv', null, '追加する'
+      );
+    }catch(err){
+      showToast('ファイルの読み込みに失敗しました');
+      resetCsvImportInput();
     }
   };
   reader.readAsText(file);
