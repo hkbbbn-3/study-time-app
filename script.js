@@ -202,6 +202,24 @@ function render(){
   `;
   document.getElementById('content').innerHTML = renderPage();
   bindEvents();
+  focusModal();
+}
+
+function closeAnyModal(){
+  if(ui.confirm){ ui.confirm = null; pendingImport = null; resetImportInput(); render(); return true; }
+  if(ui.datePicker){ ui.datePicker = null; render(); return true; }
+  if(ui.subjectEditor){ ui.subjectEditor = null; render(); return true; }
+  return false;
+}
+
+// Every render() replaces the whole canvas, which drops DOM focus back to <body> —
+// so while a modal is open we re-focus into it on every render (not just the first),
+// otherwise Tab/Escape handling on #canvas would stop receiving key events entirely.
+function focusModal(){
+  const box = document.querySelector('.modal-box');
+  if(!box) return;
+  const target = box.querySelector('.day-cell.selected') || box.querySelector('input, button, [role="button"]');
+  if(target) target.focus();
 }
 
 function openDatePicker(){
@@ -238,7 +256,7 @@ function renderDatePicker(){
 
   return `
     <div class="modal-overlay" data-action="cancel-date-picker">
-      <div class="modal-box dp-box" data-action="stop">
+      <div class="modal-box dp-box" data-action="stop" role="dialog" aria-modal="true" aria-label="日付を選択">
         <div class="cal-head">
           <div class="cal-title">${y}年 ${m+1}月</div>
           <div class="cal-nav">
@@ -263,7 +281,7 @@ function renderSubjectEditor(){
   const se = ui.subjectEditor;
   return `
     <div class="modal-overlay" data-action="cancel-subject-edit">
-      <div class="modal-box" data-action="stop">
+      <div class="modal-box" data-action="stop" role="dialog" aria-modal="true" aria-label="科目を編集">
         <div class="modal-title">科目を編集</div>
         <div class="field" style="text-align:left; margin-top:16px;">
           <label class="field-label">科目名</label>
@@ -288,7 +306,7 @@ function renderConfirmModal(){
   const c = ui.confirm;
   return `
     <div class="modal-overlay" data-action="cancel-confirm">
-      <div class="modal-box" data-action="stop">
+      <div class="modal-box" data-action="stop" role="dialog" aria-modal="true" aria-label="${escapeHtml(c.title)}">
         <div class="modal-icon">${icon('warning',24)}</div>
         <div class="modal-title">${escapeHtml(c.title)}</div>
         <div class="modal-desc">${escapeHtml(c.desc)}</div>
@@ -701,6 +719,23 @@ function bindEvents(){
 }
 
 function onKeydown(e){
+  if(e.key === 'Escape'){
+    if(closeAnyModal()) e.preventDefault();
+    return;
+  }
+  if(e.key === 'Tab'){
+    const box = document.querySelector('.modal-box');
+    if(!box) return;
+    const focusables = Array.from(box.querySelectorAll('input, button, [role="button"], [role="switch"]'));
+    if(focusables.length === 0) return;
+    const first = focusables[0], last = focusables[focusables.length-1];
+    if(e.shiftKey && document.activeElement === first){
+      e.preventDefault(); last.focus();
+    } else if(!e.shiftKey && document.activeElement === last){
+      e.preventDefault(); first.focus();
+    }
+    return;
+  }
   if(e.key !== 'Enter' && e.key !== ' ') return;
   const btn = e.target.closest('[role="button"], [role="switch"]');
   if(!btn) return;
@@ -773,8 +808,7 @@ function onClick(e){
     openSubjectEditor(btn.dataset.id); return;
   }
   if(action==='cancel-subject-edit'){
-    ui.subjectEditor = null;
-    render(); return;
+    closeAnyModal(); return;
   }
   if(action==='pick-subject-color'){
     ui.subjectEditor.color = btn.dataset.color;
@@ -793,8 +827,7 @@ function onClick(e){
     openDatePicker(); return;
   }
   if(action==='cancel-date-picker'){
-    ui.datePicker = null;
-    render(); return;
+    closeAnyModal(); return;
   }
   if(action==='dp-prev-month'){
     ui.datePicker.month--; if(ui.datePicker.month<0){ ui.datePicker.month=11; ui.datePicker.year--; }
@@ -810,10 +843,7 @@ function onClick(e){
     render(); return;
   }
   if(action==='cancel-confirm'){
-    ui.confirm = null;
-    pendingImport = null;
-    resetImportInput();
-    render(); return;
+    closeAnyModal(); return;
   }
   if(action==='confirm-delete'){
     const c = ui.confirm;
