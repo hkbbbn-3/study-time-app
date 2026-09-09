@@ -388,6 +388,14 @@ textarea{resize:none; font-weight:500; min-height:70px; font-family:inherit;}
 }
 .ghost-btn:active{transform:scale(.98);}
 .file-input{display:none;}
+.backup-warning{
+  display:flex; align-items:flex-start; gap:8px;
+  background:var(--coral-soft); color:var(--coral);
+  border-radius:14px; padding:11px 13px; margin-bottom:12px;
+  font-size:12px; font-weight:600; line-height:1.5;
+}
+.backup-warning .icon{ flex-shrink:0; margin-top:1px; }
+.backup-warning span{ color:var(--ink-soft); }
 
 /* ---------- TABBAR ---------- */
 .tabbar{

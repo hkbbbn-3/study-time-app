@@ -185,7 +185,7 @@ function render(){
             <div class="brand-sub">積み上げが、力になる</div>
           </div>
         </div>
-        <div class="iconbtn" data-action="toggle-theme" role="button" tabindex="0">${state.theme==='dark' ? icon('sun',17) : icon('moon',17)}</div>
+        <div class="iconbtn" data-action="toggle-theme" role="button" tabindex="0" aria-label="${state.theme==='dark' ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}">${state.theme==='dark' ? icon('sun',17) : icon('moon',17)}</div>
       </div>
       <div class="content fade-in" id="content"></div>
       <div class="tabbar">
@@ -249,7 +249,7 @@ function renderDatePicker(){
     const isToday = iso===todayIso;
     const isSel = iso===selIso;
     cells += `
-      <div class="day-cell ${isToday?'today':''} ${isSel?'selected':''}" data-action="dp-select-day" data-date="${iso}" role="button" tabindex="0">
+      <div class="day-cell ${isToday?'today':''} ${isSel?'selected':''}" data-action="dp-select-day" data-date="${iso}" role="button" tabindex="0" aria-label="${formatDateFull(iso)}">
         <div class="day-num">${dayNum}</div>
       </div>`;
   }
@@ -260,8 +260,8 @@ function renderDatePicker(){
         <div class="cal-head">
           <div class="cal-title">${y}年 ${m+1}月</div>
           <div class="cal-nav">
-            <div class="iconbtn" data-action="dp-prev-month" role="button" tabindex="0">${icon('chevronLeft',16)}</div>
-            <div class="iconbtn" data-action="dp-next-month" role="button" tabindex="0">${icon('chevronRight',16)}</div>
+            <div class="iconbtn" data-action="dp-prev-month" role="button" tabindex="0" aria-label="前の月">${icon('chevronLeft',16)}</div>
+            <div class="iconbtn" data-action="dp-next-month" role="button" tabindex="0" aria-label="次の月">${icon('chevronRight',16)}</div>
           </div>
         </div>
         <div class="weekday-row">${WEEKDAY_LABELS.map(w=>`<div>${w}</div>`).join('')}</div>
@@ -519,7 +519,7 @@ function renderCalendar(){
     const isToday = iso===todayIso;
     const isSel = iso===ui.selectedDate;
     cells += `
-      <div class="day-cell ${isToday?'today':''} ${isSel?'selected':''}" data-action="select-day" data-date="${iso}" role="button" tabindex="0">
+      <div class="day-cell ${isToday?'today':''} ${isSel?'selected':''}" data-action="select-day" data-date="${iso}" role="button" tabindex="0" aria-label="${formatDateFull(iso)}${achieved?'・目標達成':''}">
         ${achieved?`<div class="day-check">${icon('check',9)}</div>`:''}
         <div class="day-num">${dayNum}</div>
         <div class="day-dots">${uniqueSubs.map(sid=>`<span style="background:${subjectById(sid).color}"></span>`).join('')}</div>
@@ -536,8 +536,8 @@ function renderCalendar(){
       <div class="cal-head">
         <div class="cal-title">${y}年 ${m+1}月</div>
         <div class="cal-nav">
-          <div class="iconbtn" data-action="prev-month" role="button" tabindex="0">${icon('chevronLeft',16)}</div>
-          <div class="iconbtn" data-action="next-month" role="button" tabindex="0">${icon('chevronRight',16)}</div>
+          <div class="iconbtn" data-action="prev-month" role="button" tabindex="0" aria-label="前の月">${icon('chevronLeft',16)}</div>
+          <div class="iconbtn" data-action="next-month" role="button" tabindex="0" aria-label="次の月">${icon('chevronRight',16)}</div>
         </div>
       </div>
       <div class="weekday-row">${WEEKDAY_LABELS.map(w=>`<div>${w}</div>`).join('')}</div>
@@ -566,8 +566,8 @@ function recordItemHtml(r){
       </div>
       <div class="rec-time">${fmtMin(r.minutes)}</div>
       <div class="rec-actions">
-        <button data-action="edit-record" data-id="${r.id}">${icon('edit',13)}</button>
-        <button data-action="delete-record" data-id="${r.id}">${icon('trash',13)}</button>
+        <button data-action="edit-record" data-id="${r.id}" aria-label="記録を編集">${icon('edit',13)}</button>
+        <button data-action="delete-record" data-id="${r.id}" aria-label="記録を削除">${icon('trash',13)}</button>
       </div>
     </div>
   `;
@@ -658,7 +658,7 @@ function renderSettings(){
     <div class="card">
       <div class="toggle-row">
         <div class="t icon-row" style="justify-content:flex-start">${icon('moon',16)} ダークモード</div>
-        <div class="switch ${state.theme==='dark'?'on':''}" data-action="toggle-theme-switch" role="switch" aria-checked="${state.theme==='dark'}" tabindex="0"><div class="knob"></div></div>
+        <div class="switch ${state.theme==='dark'?'on':''}" data-action="toggle-theme-switch" role="switch" aria-checked="${state.theme==='dark'}" aria-label="ダークモード" tabindex="0"><div class="knob"></div></div>
       </div>
     </div>
 
@@ -684,8 +684,8 @@ function renderSettings(){
         <div class="subject-chip">
           <div class="dot" style="background:${s.color}"></div>
           <div class="name">${escapeHtml(s.name)}</div>
-          <button data-action="edit-subject" data-id="${s.id}">${icon('edit',13)}</button>
-          <button data-action="delete-subject" data-id="${s.id}">${icon('x',13)}</button>
+          <button data-action="edit-subject" data-id="${s.id}" aria-label="「${escapeHtml(s.name)}」を編集">${icon('edit',13)}</button>
+          <button data-action="delete-subject" data-id="${s.id}" aria-label="「${escapeHtml(s.name)}」を削除">${icon('x',13)}</button>
         </div>
       `).join('')}
       <div class="add-subject-row">
@@ -696,6 +696,10 @@ function renderSettings(){
 
     <div class="section-label">💾 データのバックアップ</div>
     <div class="card">
+      <div class="backup-warning">
+        ${icon('warning',14)}
+        <span>記録はこの端末のブラウザだけに保存されています。機種変更やブラウザのデータ削除で消えてしまうため、時々バックアップを書き出しておくことをおすすめします。</span>
+      </div>
       <button class="ghost-btn" data-action="export-json">${icon('archive',15)} バックアップを書き出す</button>
       <button class="ghost-btn" data-action="export-csv">${icon('file',15)} CSVを書き出す</button>
       <button class="ghost-btn" data-action="trigger-import">${icon('upload',15)} バックアップを読み込む</button>
