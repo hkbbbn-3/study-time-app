@@ -60,6 +60,8 @@ let ui = {
   tab: 'home',
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth(),
+  homeYear: new Date().getFullYear(),
+  homeMonth: new Date().getMonth(),
   selectedDate: isoToday(),
   form: { date: isoToday(), subjectId: null, hours: 1, minutes: 0, memo: '', editingId: null },
   confirm: null, // { title, desc, actionType, actionId }
@@ -396,8 +398,9 @@ function renderHome(){
       : { cls:'down', icon:'arrowDown', label:`${p}%`, note:`先週の同じ${dow+1}日間より少なめです` };
   }
 
-  // month progress
-  const y=now.getFullYear(), m=now.getMonth();
+  // month progress (browsable via home-prev-month/home-next-month)
+  const y=ui.homeYear, m=ui.homeMonth;
+  const isCurrentMonth = y===now.getFullYear() && m===now.getMonth();
   const daysInMonth = new Date(y,m+1,0).getDate();
   let monthTotal=0, monthGoal=0;
   for(let d=1; d<=daysInMonth; d++){
@@ -480,15 +483,22 @@ function renderHome(){
     </div>
 
     <div class="card">
+      <div class="cal-head" style="margin-bottom:10px;">
+        <div class="cal-title" style="font-size:14px;">${y}年${m+1}月${isCurrentMonth?'（今月）':''}</div>
+        <div class="cal-nav">
+          <div class="iconbtn" data-action="home-prev-month" role="button" tabindex="0" aria-label="前の月">${icon('chevronLeft',16)}</div>
+          <div class="iconbtn" data-action="home-next-month" role="button" tabindex="0" aria-label="次の月">${icon('chevronRight',16)}</div>
+        </div>
+      </div>
       <div class="progress-row">
-        <div class="t">今月の合計</div>
+        <div class="t">月の合計</div>
         <div class="n">${fmtMin(monthTotal)} / ${fmtMin(monthGoal)}</div>
       </div>
       <div class="bar-track"><div class="bar-fill" style="width:${monthPct}%"></div></div>
     </div>
 
     <div class="card">
-      <div class="card-title icon-row">${icon('book',15)} 科目ごとの合計（今月）</div>
+      <div class="card-title icon-row">${icon('book',15)} 科目ごとの合計（${y}年${m+1}月）</div>
       ${subjEntries.length ? subjEntries.map(([sid,min])=>{
         const s = subjectById(sid);
         const w = Math.round((min/maxSubj)*100);
@@ -813,6 +823,14 @@ function onClick(e){
   }
   if(action==='next-month'){
     ui.calMonth++; if(ui.calMonth>11){ ui.calMonth=0; ui.calYear++; }
+    render(); return;
+  }
+  if(action==='home-prev-month'){
+    ui.homeMonth--; if(ui.homeMonth<0){ ui.homeMonth=11; ui.homeYear--; }
+    render(); return;
+  }
+  if(action==='home-next-month'){
+    ui.homeMonth++; if(ui.homeMonth>11){ ui.homeMonth=0; ui.homeYear++; }
     render(); return;
   }
   if(action==='select-day'){
