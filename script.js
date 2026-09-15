@@ -65,8 +65,11 @@ let ui = {
   homeMonth: new Date().getMonth(),
   selectedDate: isoToday(),
   form: { date: isoToday(), subjectIds: [], hours: 1, minutes: 0, memo: '', editingId: null },
+  rangeStart: (function(){ const d=new Date(); d.setDate(d.getDate()-6); return dateToISO(d); })(), // for the home screen's date-range total
+  rangeEnd: isoToday(),
+  rangeSubjectIds: null, // null means "all subjects"; becomes an explicit array once the user filters
   confirm: null, // { title, desc, actionType, actionId }
-  datePicker: null, // { year, month } when open (for the record form's date field)
+  datePicker: null, // { year, month, target } when open — target is 'record', 'rangeStart', or 'rangeEnd'
   subjectEditor: null, // { id, name, color } when editing a subject
 };
 
@@ -234,10 +237,17 @@ function focusModal(){
   if(target) target.focus();
 }
 
-function openDatePicker(){
-  const d = isoToDate(ui.form.date);
-  ui.datePicker = { year: d.getFullYear(), month: d.getMonth() };
+// target identifies which date field the picker is editing: 'record', 'rangeStart', or 'rangeEnd'.
+function openDatePicker(target, currentIso){
+  const d = isoToDate(currentIso);
+  ui.datePicker = { year: d.getFullYear(), month: d.getMonth(), target };
   render();
+}
+
+function currentDateForTarget(target){
+  if(target==='rangeStart') return ui.rangeStart;
+  if(target==='rangeEnd') return ui.rangeEnd;
+  return ui.form.date;
 }
 
 function renderDatePicker(){
@@ -247,7 +257,7 @@ function renderDatePicker(){
   const startOffset = (first.getDay()+6)%7; // Monday-start
   const daysInMonth = new Date(y,m+1,0).getDate();
   const todayIso = isoToday();
-  const selIso = ui.form.date;
+  const selIso = currentDateForTarget(dp.target);
 
   let cells = '';
   const totalCells = Math.ceil((startOffset+daysInMonth)/7)*7;
@@ -423,6 +433,8 @@ function renderHome(){
   const maxSubj = subjEntries.length ? subjEntries[0][1] : 1;
 
   const allTime = computeAllTimeStats();
+  const rangeSubjectIds = ui.rangeSubjectIds===null ? state.subjects.map(s=>s.id) : ui.rangeSubjectIds;
+  const range = computeRangeTotal(ui.rangeStart, ui.rangeEnd, rangeSubjectIds);
 
   return `
     <div class="hero ${achieved ? 'hero-achieved' : ''}">
@@ -531,6 +543,38 @@ function renderHome(){
         </div>
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-title icon-row">${icon('calendar',15)} 期間で合計を調べる</div>
+      <div class="range-row">
+        <div class="date-field icon-row" data-action="open-date-picker" data-target="rangeStart" role="button" tabindex="0">
+          <span>${formatDateJp(ui.rangeStart)}</span>
+          ${icon('calendar',14)}
+        </div>
+        <span class="range-sep">〜</span>
+        <div class="date-field icon-row" data-action="open-date-picker" data-target="rangeEnd" role="button" tabindex="0">
+          <span>${formatDateJp(ui.rangeEnd)}</span>
+          ${icon('calendar',14)}
+        </div>
+      </div>
+      <div class="field" style="margin:14px 0 0;">
+        <label class="field-label">科目${rangeSubjectIds.length===state.subjects.length?'':'（絞り込み中）'}</label>
+        <div class="subject-pill-grid">
+          ${state.subjects.map(s=>{
+            const selected = rangeSubjectIds.includes(s.id);
+            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-range-subject" data-id="${s.id}" style="${selected?`background:${s.color};border-color:${s.color};`:''}">
+              <span class="dot" style="background:${selected?'#fff':s.color}"></span>${escapeHtml(s.name)}
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="range-result">
+        ${rangeSubjectIds.length===0
+          ? `<div class="empty" style="padding:10px 0;">科目を選んでください</div>`
+          : `<div class="v">${fmtMin(range.total)}</div>
+             <div class="l">${range.dayCount}日間の合計（1日平均 ${fmtMin(Math.round(range.total/range.dayCount))}）</div>`}
+      </div>
+    </div>
   `;
 }
 
@@ -541,6 +585,23 @@ function computeAllTimeStats(){
   const firstDate = state.records.reduce((min,r)=> r.date<min?r.date:min, state.records[0].date);
   const d = isoToDate(firstDate);
   return { totalMinutes, dayCount, firstDateLabel: `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日` };
+}
+
+// Sums minutes across [startIso, endIso] inclusive for the given subjects, tolerating
+// the range being given backwards.
+function computeRangeTotal(startIso, endIso, subjectIds){
+  let a = startIso, b = endIso;
+  if(a > b){ const t=a; a=b; b=t; }
+  const dA = isoToDate(a), dB = isoToDate(b);
+  const filterSet = new Set(subjectIds);
+  let total = 0, dayCount = 0;
+  const cur = new Date(dA);
+  while(cur <= dB){
+    total += recordsOn(dateToISO(cur)).filter(r=>filterSet.has(r.subjectId)).reduce((sum,r)=>sum+r.minutes,0);
+    dayCount++;
+    cur.setDate(cur.getDate()+1);
+  }
+  return { total, dayCount };
 }
 
 // ---------- CALENDAR ----------
@@ -636,7 +697,7 @@ function renderRecord(){
 
       <div class="field">
         <label class="field-label">日付</label>
-        <div class="date-field icon-row" data-action="open-date-picker" role="button" tabindex="0">
+        <div class="date-field icon-row" data-action="open-date-picker" data-target="record" role="button" tabindex="0">
           <span>${formatDateFull(f.date)}</span>
           ${icon('calendar',16)}
         </div>
@@ -921,8 +982,15 @@ function onClick(e){
     }
     render(); return;
   }
+  if(action==='toggle-range-subject'){
+    const id = btn.dataset.id;
+    const current = ui.rangeSubjectIds===null ? state.subjects.map(s=>s.id) : ui.rangeSubjectIds;
+    ui.rangeSubjectIds = current.includes(id) ? current.filter(x=>x!==id) : [...current, id];
+    render(); return;
+  }
   if(action==='open-date-picker'){
-    openDatePicker(); return;
+    const target = btn.dataset.target || 'record';
+    openDatePicker(target, currentDateForTarget(target)); return;
   }
   if(action==='cancel-date-picker'){
     closeAnyModal(); return;
@@ -936,7 +1004,10 @@ function onClick(e){
     render(); return;
   }
   if(action==='dp-select-day'){
-    ui.form.date = btn.dataset.date;
+    const target = ui.datePicker.target;
+    if(target==='rangeStart') ui.rangeStart = btn.dataset.date;
+    else if(target==='rangeEnd') ui.rangeEnd = btn.dataset.date;
+    else ui.form.date = btn.dataset.date;
     ui.datePicker = null;
     render(); return;
   }
