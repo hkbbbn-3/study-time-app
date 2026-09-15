@@ -628,7 +628,7 @@ function renderRecord(){
   const isEditing = !!f.editingId;
   const dayRecs = recordsOn(f.date);
   const hourOptions = Array.from({length:13}, (_,i)=>i);
-  const minOptions = [0,30];
+  const minOptions = [0,10,20,30,40,50];
 
   return `
     <div class="card">
