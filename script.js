@@ -126,7 +126,6 @@ async function loadData(){
     // no existing data yet, or storage unavailable — use defaults
   }
   applyTheme();
-  ui.form.subjectIds = state.subjects[0] ? [state.subjects[0].id] : [];
   ui.form.memo = state.lastMemo || '';
 }
 
@@ -742,6 +741,7 @@ function renderRecord(){
       <button class="submit-btn icon-row" data-action="submit-record" ${(f.hours===0 && f.minutes===0) || f.subjectIds.length===0 ?'disabled':''}>
         ${isEditing ? icon('check',15)+' 更新する' : (f.subjectIds.length>1 ? icon('plus',15)+` ${f.subjectIds.length}件を記録する` : icon('plus',15)+' 記録する')}
       </button>
+      ${f.subjectIds.length===0 ? `<div class="submit-hint">↑ 科目を選んでください</div>` : ''}
       ${isEditing ? `<div class="cancel-link" data-action="cancel-edit">編集をやめる</div>` : ''}
     </div>
 
@@ -1023,7 +1023,6 @@ function onClick(e){
     } else if(c && c.actionType==='subject'){
       state.subjects = state.subjects.filter(s=>s.id!==c.actionId);
       ui.form.subjectIds = ui.form.subjectIds.filter(id=>id!==c.actionId);
-      if(ui.form.subjectIds.length===0) ui.form.subjectIds = state.subjects[0] ? [state.subjects[0].id] : [];
       persist();
       showToast('科目を削除しました');
     } else if(c && c.actionType==='import' && pendingImport){
@@ -1112,7 +1111,7 @@ function submitRecord(){
 }
 
 function resetForm(keepDate){
-  ui.form = { date: keepDate || isoToday(), subjectIds: state.subjects[0] ? [state.subjects[0].id] : [], hours:1, minutes:0, memo:state.lastMemo||'', editingId:null };
+  ui.form = { date: keepDate || isoToday(), subjectIds: [], hours:1, minutes:0, memo:state.lastMemo||'', editingId:null };
 }
 
 function saveGoalsFromForm(){
