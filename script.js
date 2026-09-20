@@ -859,11 +859,35 @@ function onKeydown(e){
     }
     return;
   }
+  // Enter in the record form's memo/time fields submits it. Skipped while an IME is composing
+  // (Enter there just confirms the conversion; Safari reports that as keyCode 229), and
+  // Shift+Enter is left alone so a newline can still be typed in the memo.
+  if(e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229 && ui.tab==='record'){
+    const field = e.target.dataset ? e.target.dataset.field : null;
+    if(field==='memo' || field==='hours' || field==='minutes'){
+      e.preventDefault();
+      submitRecordFromKeyboard();
+      return;
+    }
+  }
   if(e.key !== 'Enter' && e.key !== ' ') return;
   const btn = e.target.closest('[role="button"], [role="switch"]');
   if(!btn) return;
   e.preventDefault();
   btn.click();
+}
+
+function submitRecordFromKeyboard(){
+  // change events for these fields only fire on blur, so read the live values first
+  const h = document.querySelector('[data-field="hours"]');
+  const m = document.querySelector('[data-field="minutes"]');
+  const memo = document.querySelector('[data-field="memo"]');
+  if(h) ui.form.hours = Number(h.value);
+  if(m) ui.form.minutes = Number(m.value);
+  if(memo) ui.form.memo = memo.value;
+  if(ui.form.subjectIds.length===0){ showToast('科目を選んでください'); return; }
+  if(ui.form.hours===0 && ui.form.minutes===0){ showToast('時間を選んでください'); return; }
+  submitRecord();
 }
 
 function onClick(e){
