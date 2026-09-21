@@ -56,7 +56,7 @@ let state = {
   theme: 'light',   // light / dark mode
   design: 'calm',   // visual design: 'calm' | 'cute' | 'neon' | 'violet' | 'sea' (independent of light/dark)
   lastMemo: '', // pre-fills the memo field for the next new record
-  balance: null,    // study-balance groups: {groups:[{name,subjectIds,target}]} with 2-4 groups, or null when the feature is off
+  balance: null,    // study-balance setup with history: {enabled, versions:[{from,savedOn,groups:[{id,name,subjectIds,target}]}]}, or null when never set up
 };
 
 const DESIGNS = [
@@ -79,6 +79,10 @@ let ui = {
   rangeStart: (function(){ const d=new Date(); d.setDate(d.getDate()-6); return dateToISO(d); })(), // for the home screen's date-range total
   rangeEnd: isoToday(),
   rangeSubjectIds: null, // null means "all subjects"; becomes an explicit array once the user filters
+  balanceEditIdx: null, // index of a history entry being corrected directly from the history list (overrides the apply date)
+  balanceApplyFrom: null, // ISO date the Settings edits apply from (null = today); shows the setup in force on that day
+  weekDay: null, // ISO date of the tapped bar in the week card (shows that day breakdown by subject)
+  weekOffset: 0, // 0 = this week, -1 = last week, ... (home week card and balance card)
   balancePeriod: 'week', // 'week' | 'month' for the home balance card
   confirm: null, // { title, desc, actionType, actionId }
   datePicker: null, // { year, month, target } when open — target is 'record', 'rangeStart', or 'rangeEnd'
@@ -142,11 +146,8 @@ async function loadData(){
       if(parsed.goals) state.goals = parsed.goals;
       if(parsed.theme) state.theme = parsed.theme;
       if(DESIGN_IDS.includes(parsed.design)) state.design = parsed.design; // older saves have no "design": keep the default
-      if(parsed.balance && parsed.balance.a && parsed.balance.b && typeof parsed.balance.targetA==='number'){ // early 2-group shape -> groups
-        const o = parsed.balance;
-        parsed.balance = { groups:[ {name:o.a.name, subjectIds:o.a.subjectIds||[], target:o.targetA}, {name:o.b.name, subjectIds:o.b.subjectIds||[], target:100-o.targetA} ] };
-      }
-      if(isValidBalance(parsed.balance)) state.balance = parsed.balance; // older saves have no balance: feature stays off
+      const migratedBalance = migrateBalance(parsed.balance); // older saves: no balance (feature stays off) or an earlier single-setup shape
+      if(migratedBalance) state.balance = migratedBalance;
       if(parsed.lastMemo) state.lastMemo = parsed.lastMemo;
     }
   }catch(e){
@@ -279,7 +280,7 @@ function focusModal(){
   if(target) target.focus();
 }
 
-// target identifies which date field the picker is editing: 'record', 'rangeStart', or 'rangeEnd'.
+// target identifies which date field the picker is editing: 'record', 'rangeStart', 'rangeEnd', 'balanceApply', 'balanceFrom:<n>' or 'balanceTo:<n>'.
 function openDatePicker(target, currentIso){
   const d = isoToDate(currentIso);
   ui.datePicker = { year: d.getFullYear(), month: d.getMonth(), target };
@@ -287,6 +288,15 @@ function openDatePicker(target, currentIso){
 }
 
 function currentDateForTarget(target){
+  if(target==='balanceApply') return balanceApplyDate();
+  if(target.startsWith('balanceTo:') && state.balance){
+    const next = state.balance.versions[Number(target.split(':')[1])+1];
+    if(next){ const e = isoToDate(next.from); e.setDate(e.getDate()-1); return dateToISO(e); }
+  }
+  if(target.startsWith('balanceFrom:') && state.balance){
+    const v = state.balance.versions[Number(target.split(':')[1])];
+    if(v) return v.from===BALANCE_SINCE_START ? isoToday() : v.from;
+  }
   if(target==='rangeStart') return ui.rangeStart;
   if(target==='rangeEnd') return ui.rangeEnd;
   return ui.form.date;
@@ -401,13 +411,97 @@ function renderPage(){
 }
 
 // ---------- HOME ----------
-// ---------- study balance (2-4 groups of subjects vs. a target split) ----------
+// ---------- study balance (2-4 groups of subjects vs. a target split, with a change history) ----------
+// state.balance = { enabled, versions:[{ from:'YYYY-MM-DD', savedOn:'YYYY-MM-DD', groups:[{id,name,subjectIds,target}] }] }
+// Each version is the setup in force from that date on, so a week or month is always judged by the settings it
+// was recorded under. The last version is the current one and the one shown in Settings.
 const BALANCE_MIN_GROUPS = 2, BALANCE_MAX_GROUPS = 4;
+const BALANCE_SINCE_START = '1970-01-01'; // "from the very beginning" marker for the first version
 
+function isValidGroups(gs){
+  return Array.isArray(gs) && gs.length>=BALANCE_MIN_GROUPS && gs.length<=BALANCE_MAX_GROUPS &&
+    gs.every(g=>g && typeof g.id==='string' && typeof g.name==='string' && Array.isArray(g.subjectIds) && typeof g.target==='number' && g.target>=0 && g.target<=100);
+}
 function isValidBalance(b){
-  return !!b && typeof b==='object' && Array.isArray(b.groups) &&
-    b.groups.length>=BALANCE_MIN_GROUPS && b.groups.length<=BALANCE_MAX_GROUPS &&
-    b.groups.every(g=>g && typeof g.name==='string' && Array.isArray(g.subjectIds) && typeof g.target==='number' && g.target>=0 && g.target<=100);
+  return !!b && typeof b==='object' && Array.isArray(b.versions) && b.versions.length>=1 &&
+    b.versions.every(v=>v && typeof v.from==='string' && isValidGroups(v.groups));
+}
+
+// Earlier saves used a single setup ({groups} or the first {a,b,targetA} shape): turn them into one version.
+function migrateBalance(raw){
+  if(!raw || typeof raw!=='object') return null;
+  if(isValidBalance(raw)) return raw;
+  let groups = null;
+  if(Array.isArray(raw.groups)) groups = raw.groups;
+  else if(raw.a && raw.b && typeof raw.targetA==='number'){
+    groups = [
+      { name:raw.a.name, subjectIds:raw.a.subjectIds||[], target:raw.targetA },
+      { name:raw.b.name, subjectIds:raw.b.subjectIds||[], target:100-raw.targetA },
+    ];
+  }
+  if(!groups) return null;
+  groups = groups.map(g=>({ id:g.id||uid(), name:g.name, subjectIds:g.subjectIds||[], target:g.target }));
+  const b = { enabled: raw.enabled!==false, versions:[{ from:BALANCE_SINCE_START, savedOn:isoToday(), groups }] };
+  return isValidBalance(b) ? b : null;
+}
+
+function balanceCurrent(){ const vs = state.balance.versions; return vs[vs.length-1]; }
+// The setup that applied on a given day (days before the first version use the first one).
+function balanceVersionFor(iso){
+  let v = state.balance.versions[0];
+  state.balance.versions.forEach(x=>{ if(x.from<=iso) v = x; });
+  return v;
+}
+// The day the Settings edits apply from: today unless one was picked (never in the future).
+function balanceApplyDate(){ const d = ui.balanceApplyFrom; return (d && d<=isoToday()) ? d : isoToday(); }
+// The setup that was in force on that day; this is what the Settings form shows and edits.
+function balanceEditIndex(){
+  const i = ui.balanceEditIdx;
+  return (state.balance && i!=null && state.balance.versions[i]) ? i : null;
+}
+function balanceEditing(){
+  const i = balanceEditIndex();
+  return i!==null ? state.balance.versions[i] : balanceVersionFor(balanceApplyDate());
+}
+// "9月1日 〜 9月18日" style label for history entry i (the first entry starts "はじめ", the last runs to 現在).
+function balancePeriodLabel(i){
+  const vs = state.balance.versions;
+  let end = '現在';
+  if(i<vs.length-1){ const e = isoToDate(vs[i+1].from); e.setDate(e.getDate()-1); end = formatDateJp(dateToISO(e)); }
+  return { text: `${i===0 ? 'はじめ' : formatDateJp(vs[i].from)} 〜 ${end}`, end };
+}
+
+// Change the setup from the chosen day on (today by default). The past before that day stays as it was.
+// - Today: a change on the same day as the last change just edits it (finishing the first setup, fixing a slip);
+//   otherwise a new setup starts today.
+// - An earlier day: a new setup starts on that day and runs until the next existing setup starts (or until now).
+//   If a setup already starts on that day, it is edited in place.
+function editBalanceVersion(fn){
+  const b = state.balance, today = isoToday(), day = balanceApplyDate();
+  const clone = gs=>JSON.parse(JSON.stringify(gs));
+  const direct = balanceEditIndex();
+  if(direct!==null){ fn(b.versions[direct].groups); persist(); render(); return; } // correcting a history entry: change that entry only
+  let target;
+  if(day===today){
+    const cur = balanceCurrent();
+    if(cur.savedOn===today || cur.from===today) target = cur;
+    else {
+      target = { from:today, savedOn:today, groups:clone(cur.groups) };
+      b.versions.push(target);
+      showToast('今日から新しい設定にしました（過去の週・月は、そのときの設定で計算します）');
+    }
+  } else {
+    const base = balanceVersionFor(day);
+    if(base.from===day) target = base;
+    else {
+      target = { from:day, savedOn:today, groups:clone(base.groups) };
+      b.versions.push(target);
+      b.versions.sort((x,y)=> x.from<y.from ? -1 : 1);
+      showToast(`${shortDate(day)}から新しい設定にしました（それより前は、前の設定のままです）`);
+    }
+  }
+  fn(target.groups);
+  persist(); render();
 }
 
 // Splits 100% evenly across n groups (any remainder goes to the first ones, in 1% steps).
@@ -422,43 +516,105 @@ function normalizedTargets(groups){
   return groups.map(g=> sum>0 ? g.target/sum : 1/groups.length);
 }
 
-// Minutes per group between the start of the period (this Monday / the 1st) and today.
+// Change the day a later setup starts on. It has to stay after the previous setup's start and before the next one's,
+// and can't be in the future (the current setup always starts today or earlier).
+function setBalanceVersionStart(idx, iso){
+  const vs = state.balance && state.balance.versions;
+  if(!vs || idx<1 || idx>=vs.length) return;
+  if(iso>isoToday()){ showToast('今日より先の日付にはできません'); return; }
+  if(iso<=vs[idx-1].from || (vs[idx+1] && iso>=vs[idx+1].from)){
+    showToast('前の設定の開始日より後、次の設定の開始日より前の日付にしてください'); return;
+  }
+  vs[idx].from = iso;
+  persist();
+  showToast('開始日を変更しました');
+}
+
+// Change the last day of setup idx. Periods sit back to back, so this moves the start of the next setup
+// (the day after). The period has to keep at least one day and stay clear of the setup after that.
+function setBalanceVersionEnd(idx, iso){
+  const vs = state.balance && state.balance.versions;
+  if(!vs || idx<0 || idx>=vs.length-1) return;
+  const nextStart = isoToDate(iso); nextStart.setDate(nextStart.getDate()+1);
+  const newNext = dateToISO(nextStart);
+  if(newNext>isoToday()){ showToast('終了日は昨日までにしてください（今日からは現在の設定です）'); return; }
+  if(newNext<=vs[idx].from || (vs[idx+2] && newNext>=vs[idx+2].from)){
+    showToast('終了日は、この期間の開始日以降、次の期間の終了日より前にしてください'); return;
+  }
+  vs[idx+1].from = newNext;
+  persist();
+  showToast('期間を変更しました');
+}
+
+function shortDate(iso){ const d = isoToDate(iso); return `${d.getMonth()+1}/${d.getDate()}`; }
+
+// Minutes and target share per group for the week shown on the home screen (ui.weekOffset) or the month shown
+// there (ui.homeYear / ui.homeMonth). Records are grouped by the setup in force on their own day, and each
+// group's target is its share averaged over the days of the period, so a mid-period change is handled fairly.
 function computeBalance(period){
   const b = state.balance;
   if(!b) return null;
-  const now = new Date();
-  const end = dateToISO(now);
-  let start;
-  if(period==='month') start = dateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
-  else { const d = new Date(now); d.setDate(now.getDate() - ((now.getDay()+6)%7)); start = dateToISO(d); }
-  const groupOf = {};
-  b.groups.forEach((g,i)=>g.subjectIds.forEach(id=>{ groupOf[id] = i; }));
-  const mins = b.groups.map(()=>0);
+  const now = new Date(), todayIso = isoToday();
+  let start, end, label;
+  if(period==='month'){
+    const y = ui.homeYear, m = ui.homeMonth;
+    start = dateToISO(new Date(y, m, 1)); end = dateToISO(new Date(y, m+1, 0));
+    label = `${y}年${m+1}月${(y===now.getFullYear() && m===now.getMonth()) ? '（今月）' : ''}`;
+  } else {
+    const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay()+6)%7) + ui.weekOffset*7);
+    const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+    start = dateToISO(mon); end = dateToISO(sun);
+    label = `${mon.getMonth()+1}/${mon.getDate()}〜${sun.getMonth()+1}/${sun.getDate()}${ui.weekOffset===0 ? '（今週）' : ''}`;
+  }
+  const lastDay = end<todayIso ? end : todayIso;
+  const days = [];
+  if(start<=lastDay){ for(const d=isoToDate(start); dateToISO(d)<=lastDay; d.setDate(d.getDate()+1)) days.push(dateToISO(d)); }
+  if(days.length===0) days.push(todayIso); // a period that hasn't started yet: use today's setup
+
+  const order = balanceCurrent().groups.map(g=>g.id);
+  const names = {}, shareSum = {};
+  b.versions.forEach(v=>v.groups.forEach(g=>{ names[g.id] = g.name; }));
+  days.forEach(iso=>{
+    const v = balanceVersionFor(iso), t = normalizedTargets(v.groups);
+    v.groups.forEach((g,i)=>{ shareSum[g.id] = (shareSum[g.id]||0) + t[i]; if(!order.includes(g.id)) order.push(g.id); });
+  });
+  const ids = order.filter(id=>id in shareSum);
+  const index = {}; ids.forEach((id,i)=>{ index[id] = i; });
+  const mins = ids.map(()=>0);
   let other = 0;
   state.records.forEach(r=>{
     if(r.date<start || r.date>end) return;
-    if(r.subjectId in groupOf) mins[groupOf[r.subjectId]] += r.minutes;
-    else other += r.minutes;
+    const g = balanceVersionFor(r.date).groups.find(g=>g.subjectIds.includes(r.subjectId));
+    if(g && g.id in index) mins[index[g.id]] += r.minutes; else other += r.minutes;
   });
-  return { mins, other };
+  const changes = b.versions.filter(v=>v.from>start && v.from<=lastDay).map(v=>v.from);
+  return { groups: ids.map(id=>({ id, name:names[id] })), mins, targets: ids.map(id=> shareSum[id]/days.length*100), other, label, changes };
 }
 
 // A plain-language next step. The group that is furthest ahead of its target sets the pace; every other
 // group is told how much more it needs to catch up to the target split (nobody is asked to do less).
-function balanceAdvice(mins, groups){
+function balanceAdvice(mins, names, targets){
   const total = mins.reduce((a,x)=>a+x, 0);
   if(total===0) return 'この期間の記録はまだありません。記録するとバランスが見えてきます。';
-  const t = normalizedTargets(groups);
-  if(mins.every((m,i)=>Math.abs((m/total)*100 - t[i]*100) <= 5)) return '目標に近いバランスです。この調子！';
+  const t = targets.map(x=>x/100);
+  if(mins.every((m,i)=>Math.abs((m/total)*100 - targets[i]) <= 5)) return '目標に近いバランスです。この調子！';
   const pace = Math.max(...mins.map((m,i)=> t[i]>0 ? m/t[i] : 0));
   const parts = [];
   mins.forEach((m,i)=>{
     const add = Math.ceil((t[i]*pace - m)/10)*10;
-    if(add>=10) parts.push({ name:groups[i].name, add });
+    if(add>=10) parts.push({ name:names[i], add });
   });
   if(parts.length===0) return '目標に近いバランスです。この調子！';
   parts.sort((x,y)=>y.add-x.add);
   return `目標のバランスに近づけるには、${parts.map(p=>`${escapeHtml(p.name)}にあと${fmtMin(p.add)}`).join('、')}あてるのがおすすめです。`;
+}
+
+// Whole-number percentages that always add up to 100 (largest-remainder rounding).
+function roundTo100(values){
+  const out = values.map(Math.floor);
+  let left = 100 - out.reduce((a,x)=>a+x, 0);
+  values.map((v,i)=>({ i, frac:v-Math.floor(v) })).sort((x,y)=>y.frac-x.frac).forEach(o=>{ if(left>0){ out[o.i]++; left--; } });
+  return out;
 }
 
 function renderBalanceHome(){
@@ -470,23 +626,17 @@ function renderBalanceHome(){
       <button class="ghost-btn" data-action="go-tab" data-tab="settings">設定でバランスを決める</button>
     </div>`;
   }
-  const groups = state.balance.groups;
   const res = computeBalance(ui.balancePeriod);
+  const groups = res.groups;
   const total = res.mins.reduce((a,x)=>a+x, 0);
-  // percentages that always add up to 100 (largest-remainder rounding)
-  const raw = res.mins.map(m=> total>0 ? (m/total)*100 : 0);
-  const pcts = raw.map(Math.floor);
-  let left = total>0 ? 100 - pcts.reduce((a,x)=>a+x, 0) : 0;
-  raw.map((v,i)=>({i, frac:v-Math.floor(v)})).sort((x,y)=>y.frac-x.frac).forEach(o=>{ if(left>0){ pcts[o.i]++; left--; } });
-  // marks on the bar where the target split changes from one group to the next
-  // The targets actually used are the entered ones scaled to add up to 100%, so show those (rounded to add up to 100).
-  const tShare = normalizedTargets(groups).map(x=>x*100);
-  const tPcts = tShare.map(Math.floor);
-  let tLeft = 100 - tPcts.reduce((a,x)=>a+x, 0);
-  tShare.map((v,i)=>({i, frac:v-Math.floor(v)})).sort((x,y)=>y.frac-x.frac).forEach(o=>{ if(tLeft>0){ tPcts[o.i]++; tLeft--; } });
+  const nowD = new Date();
+  const atLatest = ui.balancePeriod==='month' ? (ui.homeYear===nowD.getFullYear() && ui.homeMonth===nowD.getMonth()) : ui.weekOffset>=0;
+  const pcts = total>0 ? roundTo100(res.mins.map(m=>(m/total)*100)) : res.mins.map(()=>0);
+  // The targets shown are the ones actually used for the comparison (scaled to 100 and averaged over the period).
+  const tPcts = roundTo100(res.targets);
   let acc = 0;
-  const marks = tShare.slice(0,-1).map(v=>{ acc += v; return acc; });
-  const ariaLabel = groups.map((g,i)=>`${escapeHtml(g.name)} ${pcts[i]}%（目標 ${tPcts[i]}%）`).join("、");
+  const marks = res.targets.slice(0,-1).map(v=>{ acc += v; return acc; });
+  const ariaLabel = groups.map((g,i)=>`${escapeHtml(g.name)} ${pcts[i]}%（目標 ${tPcts[i]}%）`).join('、');
   return `
     <div class="card">
       <div class="card-title icon-row">${icon('target',15)} 学習バランス</div>
@@ -494,8 +644,15 @@ function renderBalanceHome(){
         <button type="button" class="${ui.balancePeriod==='week'?'active':''}" data-action="balance-period" data-period="week" aria-pressed="${ui.balancePeriod==='week'}">今週</button>
         <button type="button" class="${ui.balancePeriod==='month'?'active':''}" data-action="balance-period" data-period="month" aria-pressed="${ui.balancePeriod==='month'}">今月</button>
       </div>
+      <div class="balance-period-row">
+        <div class="balance-period-label">${res.label}</div>
+        <div class="cal-nav">
+          <div class="iconbtn" data-action="${ui.balancePeriod==='month'?'home-prev-month':'home-prev-week'}" role="button" tabindex="0" aria-label="${ui.balancePeriod==='month'?'前の月':'前の週'}">${icon('chevronLeft',16)}</div>
+          <div class="iconbtn ${atLatest?'is-disabled':''}" ${atLatest?'aria-disabled="true"':`data-action="${ui.balancePeriod==='month'?'home-next-month':'home-next-week'}"`} role="button" tabindex="${atLatest?-1:0}" aria-label="${ui.balancePeriod==='month'?'次の月':'次の週'}">${icon('chevronRight',16)}</div>
+        </div>
+      </div>
       <div class="balance-bar" role="img" aria-label="${ariaLabel}">
-        <div class="balance-track">${groups.map((g,i)=>`<div class="balance-seg g${i}" style="width:${pcts[i]}%"></div>`).join("")}</div>
+        <div class="balance-track">${groups.map((g,i)=>`<div class="balance-seg g${i}" style="width:${pcts[i]}%"></div>`).join('')}</div>
         ${marks.map(p=>`<div class="balance-target" style="left:${p}%"></div>`).join('')}
       </div>
       ${groups.map((g,i)=>`
@@ -505,7 +662,8 @@ function renderBalanceHome(){
           <span class="balance-val">${total>0 ? `${pcts[i]}%` : '―'}<small>${total>0 ? `（${fmtMin(res.mins[i])}）` : ''}</small></span>
           <span class="balance-goal">目標 ${tPcts[i]}%</span>
         </div>`).join('')}
-      <div class="balance-advice">${balanceAdvice(res.mins, groups)}</div>
+      <div class="balance-advice">${balanceAdvice(res.mins, groups.map(g=>g.name), res.targets)}</div>
+      ${res.changes.length ? `<div class="balance-note">この期間の途中で、目標やグループの設定が変わっています（${res.changes.map(shortDate).join('、')}から）。目標の割合は、日数で平均して比べています。</div>` : ''}
       ${res.other>0 ? `<div class="balance-note">グループ未設定の科目：${fmtMin(res.other)}（この割合には含めていません）</div>` : ''}
     </div>`;
 }
@@ -524,8 +682,14 @@ function renderHome(){
   const now = new Date();
   const dateStr = `${now.getMonth()+1}月${now.getDate()}日（${'日月火水木金土'[now.getDay()]}）`;
 
-  // week strip: Monday-start
-  const day0 = new Date(now); const dow = (now.getDay()+6)%7; day0.setDate(now.getDate()-dow);
+  // week strip: Monday-start, browsable with home-prev-week / home-next-week (ui.weekOffset 0 = this week)
+  const dow = (now.getDay()+6)%7;
+  const thisMonday = new Date(now); thisMonday.setDate(now.getDate()-dow);
+  const day0 = new Date(thisMonday); day0.setDate(thisMonday.getDate() + ui.weekOffset*7);
+  const isCurrentWeek = ui.weekOffset===0;
+  const daysShown = isCurrentWeek ? dow+1 : 7; // days that count for the comparison (up to today for the current week)
+  const sumDays = (start, n)=>{ let t=0; for(let i=0;i<n;i++){ const d=new Date(start); d.setDate(start.getDate()+i); t+=totalOn(dateToISO(d)); } return t; };
+  const heroWeekTotal = sumDays(thisMonday, 7); // the hero card always shows the real current week
   let weekTotal=0;
   let weekHtml='';
   for(let i=0;i<7;i++){
@@ -536,30 +700,51 @@ function renderHome(){
     const g = goalFor(iso) || 1;
     const h = Math.max(4, Math.min(100, Math.round((mins/g)*100)));
     const isToday = iso===today;
+    const isSel = ui.weekDay===iso;
     weekHtml += `
-      <div class="wcol">
+      <button type="button" class="wcol ${isSel?'selected':''}" data-action="week-select-day" data-date="${iso}" aria-pressed="${isSel}" aria-label="${d.getMonth()+1}月${d.getDate()}日（${WEEKDAY_LABELS[i]}） ${mins>0?fmtMin(mins):'記録なし'}">
         <div class="wbar-track"><div class="wbar-fill" style="height:${mins>0?h:4}%; opacity:${mins>0?1:0.35}"></div></div>
         <div class="wlabel ${isToday?'today':''}">${WEEKDAY_LABELS[i]}</div>
+      </button>`;
+  }
+  // breakdown of the tapped day, only while that day belongs to the week being shown
+  let dayDetailHtml = '';
+  const inShownWeek = ui.weekDay && ui.weekDay>=dateToISO(day0) && ui.weekDay<=dateToISO(new Date(day0.getFullYear(), day0.getMonth(), day0.getDate()+6));
+  if(inShownWeek){
+    const dd = isoToDate(ui.weekDay);
+    const bySubj = {};
+    recordsOn(ui.weekDay).forEach(r=>{ bySubj[r.subjectId] = (bySubj[r.subjectId]||0) + r.minutes; });
+    const entries = Object.entries(bySubj).sort((a,b)=>b[1]-a[1]);
+    const dayTotal = totalOn(ui.weekDay), dayGoal = goalFor(ui.weekDay);
+    dayDetailHtml = `
+      <div class="day-detail" aria-live="polite">
+        <div class="day-detail-head">
+          <div class="day-detail-title">${dd.getMonth()+1}月${dd.getDate()}日（${WEEKDAY_LABELS[(dd.getDay()+6)%7]}）</div>
+          <div class="day-detail-total">${dayTotal>0 ? fmtMin(dayTotal) : '記録なし'}${dayGoal>0 && dayTotal>0 ? `<small>（目標の ${Math.round(dayTotal/dayGoal*100)}%）</small>` : ''}</div>
+        </div>
+        ${entries.map(([sid,min])=>{ const sj = subjectById(sid); return `<div class="subj-row"><div class="subj-dot" style="background:${sj.color}"></div><div class="subj-name">${escapeHtml(sj.name)}</div><div class="subj-min">${fmtMin(min)}</div></div>`; }).join('')}
+        <button type="button" class="week-back" style="margin:var(--sp-2) 0 0" data-action="goto-record-day" data-date="${ui.weekDay}">この日の記録を追加・編集する</button>
       </div>`;
   }
+  const dayEnd = new Date(day0); dayEnd.setDate(day0.getDate()+6);
+  const weekTitle = `${day0.getMonth()+1}/${day0.getDate()}〜${dayEnd.getMonth()+1}/${dayEnd.getDate()}${isCurrentWeek?'（今週）':''}`;
 
-  // weekly comparison: this week so-far (Mon -> today) vs the same weekday range last week
-  let lastWeekSameRange = 0;
-  for(let i=0; i<=dow; i++){
-    const d = new Date(day0); d.setDate(day0.getDate()+i-7);
-    lastWeekSameRange += totalOn(dateToISO(d));
-  }
-  const thisWeekSoFar = weekTotal;
+  // weekly comparison: the shown week vs the week before it (same weekday range while the week is still running)
+  const prevWeekStart = new Date(day0); prevWeekStart.setDate(day0.getDate()-7);
+  const lastWeekSameRange = sumDays(prevWeekStart, daysShown);
+  const thisWeekSoFar = sumDays(day0, daysShown);
+  const prevLabel = isCurrentWeek ? '先週' : '前の週';
   let cmp;
   if(lastWeekSameRange===0 && thisWeekSoFar===0){
     cmp = { cls:'neutral', icon:'minus', label:'―', note:'まだ記録がありません' };
   } else if(lastWeekSameRange===0){
-    cmp = { cls:'up', icon:'arrowUp', label:'NEW', note:'先週は記録なしでした。今週からいいペース！' };
+    cmp = { cls:'up', icon:'arrowUp', label:'NEW', note: isCurrentWeek ? '先週は記録なしでした。今週からいいペース！' : '前の週は記録がありませんでした' };
   } else {
     const p = Math.round(((thisWeekSoFar-lastWeekSameRange)/lastWeekSameRange)*100);
+    const span = isCurrentWeek ? `先週の同じ${daysShown}日間` : '前の週';
     cmp = p>=0
-      ? { cls:'up', icon:'arrowUp', label:`+${p}%`, note:`先週の同じ${dow+1}日間より伸びています` }
-      : { cls:'down', icon:'arrowDown', label:`${p}%`, note:`先週の同じ${dow+1}日間より少なめです` };
+      ? { cls:'up', icon:'arrowUp', label:`+${p}%`, note:`${span}より伸びています` }
+      : { cls:'down', icon:'arrowDown', label:`${p}%`, note:`${span}より少なめです` };
   }
 
   // month progress (browsable via home-prev-month/home-next-month)
@@ -617,7 +802,7 @@ function renderHome(){
         </div>
       </div>
       <div class="hero-foot">
-        <div><div class="val">${fmtMin(weekTotal)}</div><div class="lab">今週</div></div>
+        <div><div class="val">${fmtMin(heroWeekTotal)}</div><div class="lab">今週</div></div>
         <div><div class="val">${goal>0?fmtMin(goal):'未設定'}</div><div class="lab">今日の目標</div></div>
       </div>
     </div>
@@ -627,18 +812,27 @@ function renderHome(){
 
     <div class="section-label">今週</div>
     <div class="card">
-      <div class="card-title icon-row">${icon('trending',15)} 今週の推移</div>
+      <div class="cal-head" style="margin-bottom:var(--sp-3);">
+        <div class="cal-title">${weekTitle}</div>
+        <div class="cal-nav">
+          <div class="iconbtn" data-action="home-prev-week" role="button" tabindex="0" aria-label="前の週">${icon('chevronLeft',16)}</div>
+          <div class="iconbtn ${isCurrentWeek?'is-disabled':''}" ${isCurrentWeek?'aria-disabled="true"':'data-action="home-next-week"'} role="button" tabindex="${isCurrentWeek?-1:0}" aria-label="次の週">${icon('chevronRight',16)}</div>
+        </div>
+      </div>
+      ${isCurrentWeek ? '' : `<button type="button" class="week-back" data-action="home-this-week">今週に戻る</button>`}
+      <div class="card-title icon-row">${icon('trending',15)} 1日ごとの推移</div>
       <div class="weekstrip">${weekHtml}</div>
+      ${dayDetailHtml || `<div class="week-hint">棒をタップすると、その日の内訳が見られます</div>`}
       <div class="week-compare">
         <div class="card-title icon-row">${icon('trending',15)} 週間比較</div>
         <div class="compare-row">
           <div class="compare-side">
-            <div class="compare-label">先週（同期間）</div>
+            <div class="compare-label">${isCurrentWeek ? '先週（同期間）' : '前の週'}</div>
             <div class="compare-val">${fmtMin(lastWeekSameRange)}</div>
           </div>
           <div class="compare-badge ${cmp.cls}">${icon(cmp.icon,12)} ${cmp.label}</div>
           <div class="compare-side right">
-            <div class="compare-label">今週</div>
+            <div class="compare-label">${isCurrentWeek ? '今週' : 'この週'}</div>
             <div class="compare-val">${fmtMin(thisWeekSoFar)}</div>
           </div>
         </div>
@@ -1009,17 +1203,38 @@ function renderSettings(){
 function renderBalanceSettings(){
   const bal = state.balance;
   if(!bal || bal.enabled===false){
-    const hasSaved = !!bal; // switched off earlier: the groups, subjects and targets are still stored
+    const hasSaved = !!bal; // switched off earlier: the setup and its history are still stored
     return `
       <div class="balance-note" style="margin-top:0">${hasSaved
         ? 'バランス機能はオフです。前回の設定（グループ・科目・目標）は残してあるので、オンにするとそのまま復元されます。'
         : `科目をグループに分けて、時間の配分を目標と比べます（2〜${BALANCE_MAX_GROUPS}グループ）。日商簿記を含む科目は、自動で2つ目のグループに入ります（あとから変更できます）。`}</div>
       <button class="submit-btn" style="margin-top:14px" data-action="balance-enable">${hasSaved ? '前回の設定でバランスを見る' : 'バランスを見る設定を始める'}</button>`;
   }
-  const groups = bal.groups;
+  const editIdx = balanceEditIndex();
+  const applyDay = balanceApplyDate(), isToday = applyDay===isoToday();
+  const groups = balanceEditing().groups;
   const sum = groups.reduce((a,g)=>a+g.target, 0);
   const pctOptions = Array.from({length:19}, (_,i)=>(i+1)*5);
+  const versions = bal.versions;
   return `
+    <div id="balance-editor-top"></div>
+    ${editIdx!==null ? `
+      <div class="balance-editing-banner" role="status">
+        <div class="balance-editing-title">履歴を修正中：${balancePeriodLabel(editIdx).text}</div>
+        <div class="balance-note" style="margin-top:var(--sp-1)">この期間の設定だけを、下のフォームで直接直せます（前後の期間は変わりません）。</div>
+        <button type="button" class="week-back" style="margin:var(--sp-2) 0 0" data-action="balance-edit-stop">修正を終える</button>
+      </div>` : `
+      <label class="field-label">この変更をいつから適用する？</label>
+      <div class="balance-apply-row">
+        <div class="date-field icon-row" data-action="open-date-picker" data-target="balanceApply" role="button" tabindex="0" aria-label="変更を適用する日を選ぶ（いまは${formatDateFull(applyDay)}）">
+          <span>${isToday ? '今日（' + formatDateJp(applyDay) + '）から' : formatDateJp(applyDay) + ' から'}</span>${icon('calendar',14)}
+        </div>
+        ${isToday ? '' : `<button type="button" class="week-back" style="margin:0" data-action="balance-apply-today">今日に戻す</button>`}
+      </div>
+      <div class="balance-note" style="margin-top:var(--sp-2)">${isToday
+        ? '目標やグループを変えると、今日から新しい設定になります。過去の週・月は、そのときの設定のまま計算されます。'
+        : `${formatDateJp(applyDay)}より前は、いまの設定のままです。${formatDateJp(applyDay)}から、次の設定が始まる日の前日（なければ現在）までが、下の内容に変わります。下は、その日に使っていた設定です。`}</div>`}
+    <div class="divider"></div>
     ${groups.map((g,i)=>`
       <div class="balance-group">
         <div class="balance-group-head">
@@ -1046,11 +1261,39 @@ function renderBalanceSettings(){
       <div class="divider"></div>
     `).join('')}
     <div class="balance-sum ${sum===100?'ok':'warn'}" role="status">目標の合計：${sum}%${sum===100 ? '' : '（100%にすると分かりやすくなります。このままでも、割合に直して計算します）'}</div>
+    ${groups.length<=BALANCE_MIN_GROUPS ? `<div class="balance-note" style="margin-top:0;margin-bottom:var(--sp-3)">バランスは、グループが最低${BALANCE_MIN_GROUPS}つあって成り立つので、いまは削除できません（グループを追加すると、削除ボタンが出ます）。グループをなくしたいときは、下の「バランス機能をオフにする」を押してください。</div>` : ""}
     <div class="balance-actions">
       <button class="ghost-btn" data-action="balance-equalize">均等にする</button>
       ${groups.length<BALANCE_MAX_GROUPS ? `<button class="ghost-btn" data-action="balance-add-group">グループを追加</button>` : ''}
     </div>
-    <button class="ghost-btn" style="margin-top:var(--sp-2)" data-action="balance-disable">バランス機能をオフにする</button>`;
+    <div class="divider"></div>
+    <label class="field-label">設定の履歴</label>
+    <div class="balance-history">
+      ${versions.map((v,i)=>({v,i})).reverse().map(({v,i})=>{
+        const t = normalizedTargets(v.groups);
+        const isFirst = i===0, isLast = i===versions.length-1;
+        const { text:period, end:endLabel } = balancePeriodLabel(i);
+        return `<div class="balance-history-row ${editIdx===i?'editing':''}">
+          <div class="balance-history-main">
+            <div class="balance-history-date">${period}${isLast ? '（現在の設定）' : ''}</div>
+            <div class="balance-history-sum">${v.groups.map((g,gi)=>`${escapeHtml(g.name)} ${Math.round(t[gi]*100)}%`).join(' ／ ')}</div>
+            ${isFirst ? `<div class="balance-history-hint">最初の設定です。開始日より前の日も、この設定で計算します。${isLast ? '' : '終了日は変えられます。'}</div>` : ''}
+            <div class="balance-period-fields">
+              ${isFirst ? '' : `<div class="date-field icon-row balance-from-field" data-action="open-date-picker" data-target="balanceFrom:${i}" role="button" tabindex="0" aria-label="この設定の開始日を変える（いまは${formatDateFull(v.from)}）">
+                <span>開始日：${formatDateJp(v.from)}</span>${icon('calendar',14)}
+              </div>`}
+              ${isLast ? '' : `<div class="date-field icon-row balance-from-field" data-action="open-date-picker" data-target="balanceTo:${i}" role="button" tabindex="0" aria-label="この設定の終了日を変える（いまは${endLabel}）">
+                <span>終了日：${endLabel}</span>${icon('calendar',14)}
+              </div>`}
+            </div>
+            <button type="button" class="week-back" style="margin:var(--sp-2) 0 0" data-action="balance-edit-version" data-index="${i}">${editIdx===i ? '修正中（上のフォームで直せます）' : 'この期間の条件（グループ・科目・目標）を修正する'}</button>
+          </div>
+          ${versions.length>1 ? `<button type="button" class="balance-remove" data-action="balance-delete-version" data-index="${i}" aria-label="この設定を履歴から削除">${icon('x',13)}</button>` : ''}
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="balance-note">「この期間の条件を修正する」を押すと、その期間のグループ・科目・目標を直せます。開始日・終了日を押すと期間も変えられます。期間は前後の設定とつながっているので、終了日を変えると次の設定の開始日も変わります。履歴を削除すると、その期間は前の設定で計算し直されます。同じ日のうちの変更は、新しい履歴を作らず上書きします。</div>
+    <button class="ghost-btn" style="margin-top:var(--sp-3)" data-action="balance-disable">バランス機能をオフにする</button>`;
 }
 
 function escapeHtml(str){
@@ -1160,6 +1403,10 @@ function onClick(e){
     ui.homeMonth++; if(ui.homeMonth>11){ ui.homeMonth=0; ui.homeYear++; }
     render(); return;
   }
+  if(action==='home-prev-week'){ ui.weekOffset--; ui.weekDay = null; render(); return; }
+  if(action==='home-next-week'){ if(ui.weekOffset<0) ui.weekOffset++; ui.weekDay = null; render(); return; }
+  if(action==='home-this-week'){ ui.weekOffset = 0; ui.weekDay = null; render(); return; }
+  if(action==='week-select-day'){ ui.weekDay = ui.weekDay===btn.dataset.date ? null : btn.dataset.date; render(); return; }
   if(action==='select-day'){
     ui.selectedDate = btn.dataset.date;
     render(); return;
@@ -1265,6 +1512,14 @@ function onClick(e){
   }
   if(action==='dp-select-day'){
     const target = ui.datePicker.target;
+    if(target==='balanceApply'){
+      const day = btn.dataset.date;
+      if(day>isoToday()) showToast('今日より先の日付にはできません');
+      else { ui.balanceApplyFrom = day===isoToday() ? null : day; ui.balanceEditIdx = null; }
+      ui.datePicker = null; render(); return;
+    }
+    if(target.startsWith('balanceTo:')){ setBalanceVersionEnd(Number(target.split(':')[1]), btn.dataset.date); ui.datePicker = null; render(); return; }
+    if(target.startsWith('balanceFrom:')){ setBalanceVersionStart(Number(target.split(':')[1]), btn.dataset.date); ui.datePicker = null; render(); return; }
     if(target==='rangeStart') ui.rangeStart = btn.dataset.date;
     else if(target==='rangeEnd') ui.rangeEnd = btn.dataset.date;
     else ui.form.date = btn.dataset.date;
@@ -1321,6 +1576,14 @@ function onClick(e){
     saveGoalsFromForm();
     return;
   }
+  if(action==='balance-apply-today'){ ui.balanceApplyFrom = null; render(); return; }
+  if(action==='balance-edit-version' && state.balance && state.balance.versions[Number(btn.dataset.index)]){
+    ui.balanceEditIdx = Number(btn.dataset.index); ui.balanceApplyFrom = null;
+    render();
+    const top = document.getElementById('balance-editor-top'); if(top) top.scrollIntoView({ block:'start' });
+    return;
+  }
+  if(action==='balance-edit-stop'){ ui.balanceEditIdx = null; render(); return; }
   if(action==='balance-period'){
     ui.balancePeriod = btn.dataset.period==='month' ? 'month' : 'week';
     render(); return;
@@ -1329,42 +1592,51 @@ function onClick(e){
     if(state.balance){ state.balance.enabled = true; persist(); render(); return; } // restore the earlier settings
     // First time: subjects mentioning 簿記 start in group 2, everything else in group 1; both can be changed afterwards.
     const isBookkeeping = s=>/簿記/.test(s.name);
-    state.balance = { groups: [
-      { name:'デジハリ', subjectIds: state.subjects.filter(s=>!isBookkeeping(s)).map(s=>s.id), target:50 },
-      { name:'T&L・簿記', subjectIds: state.subjects.filter(isBookkeeping).map(s=>s.id), target:50 },
-    ] };
+    state.balance = { enabled:true, versions:[{ from:BALANCE_SINCE_START, savedOn:isoToday(), groups:[
+      { id:uid(), name:'デジハリ', subjectIds: state.subjects.filter(s=>!isBookkeeping(s)).map(s=>s.id), target:50 },
+      { id:uid(), name:'T&L・簿記', subjectIds: state.subjects.filter(isBookkeeping).map(s=>s.id), target:50 },
+    ] }] };
     persist(); render(); return;
   }
   if(action==='balance-disable' && state.balance){
-    state.balance.enabled = false; // keep groups, subjects and targets so turning it back on restores them
+    ui.balanceEditIdx = null;
+    state.balance.enabled = false; // keep the setup and its history so turning it back on restores them
     persist(); render(); return;
   }
-  if(action==='balance-add-group' && state.balance && state.balance.groups.length<BALANCE_MAX_GROUPS){
-    const groups = state.balance.groups;
-    groups.push({ name:`グループ${groups.length+1}`, subjectIds:[], target:0 });
-    evenTargets(groups.length).forEach((t,i)=>{ groups[i].target = t; });
-    persist(); render(); return;
+  if(action==='balance-add-group' && state.balance && balanceEditing().groups.length<BALANCE_MAX_GROUPS){
+    editBalanceVersion(gs=>{
+      gs.push({ id:uid(), name:`グループ${gs.length+1}`, subjectIds:[], target:0 });
+      evenTargets(gs.length).forEach((t,i)=>{ gs[i].target = t; });
+    });
+    return;
   }
-  if(action==='balance-remove-group' && state.balance && state.balance.groups.length>BALANCE_MIN_GROUPS){
-    const groups = state.balance.groups;
-    groups.splice(Number(btn.dataset.index), 1);
-    evenTargets(groups.length).forEach((t,i)=>{ groups[i].target = t; });
-    persist(); render(); return;
+  if(action==='balance-remove-group' && state.balance && balanceEditing().groups.length>BALANCE_MIN_GROUPS){
+    editBalanceVersion(gs=>{
+      gs.splice(Number(btn.dataset.index), 1);
+      evenTargets(gs.length).forEach((t,i)=>{ gs[i].target = t; });
+    });
+    return;
   }
   if(action==='balance-equalize' && state.balance){
-    const groups = state.balance.groups;
-    evenTargets(groups.length).forEach((t,i)=>{ groups[i].target = t; });
-    persist(); render(); return;
+    editBalanceVersion(gs=>{ evenTargets(gs.length).forEach((t,i)=>{ gs[i].target = t; }); });
+    return;
   }
   if(action==='balance-toggle-subject' && state.balance){
-    const groups = state.balance.groups, idx = Number(btn.dataset.index), id = btn.dataset.id;
-    if(!groups[idx]) return;
-    if(groups[idx].subjectIds.includes(id)) groups[idx].subjectIds = groups[idx].subjectIds.filter(x=>x!==id);
-    else {
-      groups.forEach(g=>{ g.subjectIds = g.subjectIds.filter(x=>x!==id); }); // a subject belongs to one group only
-      groups[idx].subjectIds = [...groups[idx].subjectIds, id];
-    }
-    persist(); render(); return;
+    const idx = Number(btn.dataset.index), id = btn.dataset.id;
+    if(!balanceEditing().groups[idx]) return;
+    editBalanceVersion(gs=>{
+      if(gs[idx].subjectIds.includes(id)) gs[idx].subjectIds = gs[idx].subjectIds.filter(x=>x!==id);
+      else {
+        gs.forEach(g=>{ g.subjectIds = g.subjectIds.filter(x=>x!==id); }); // a subject belongs to one group only
+        gs[idx].subjectIds = [...gs[idx].subjectIds, id];
+      }
+    });
+    return;
+  }
+  if(action==='balance-delete-version' && state.balance && state.balance.versions.length>1){
+    state.balance.versions.splice(Number(btn.dataset.index), 1);
+    ui.balanceEditIdx = null;
+    persist(); render(); showToast('履歴から削除しました'); return;
   }
   if(action==='export-json'){ exportJson(); return; }
   if(action==='export-csv'){ exportCsv(); return; }
@@ -1384,13 +1656,18 @@ function onChange(e){
   if(field==='memo'){ ui.form.memo = e.target.value; return; }
   if(field==='subject-edit-name'){ ui.subjectEditor.name = e.target.value; return; }
   if(state.balance && field==='balance-name'){
-    const g = state.balance.groups[Number(e.target.dataset.index)];
-    if(g){ g.name = e.target.value.trim() || `グループ${Number(e.target.dataset.index)+1}`; persist(); }
+    // A name is just a label, so a rename applies to every version of that group (it is not a history event).
+    const cur = balanceEditing().groups[Number(e.target.dataset.index)];
+    if(cur){
+      const name = e.target.value.trim() || `グループ${Number(e.target.dataset.index)+1}`;
+      state.balance.versions.forEach(v=>v.groups.forEach(g=>{ if(g.id===cur.id) g.name = name; }));
+      persist();
+    }
     return; // no re-render, so a click on a subject button right after typing still lands
   }
   if(state.balance && field==='balance-target'){
-    const g = state.balance.groups[Number(e.target.dataset.index)];
-    if(g){ g.target = Number(e.target.value); persist(); render(); }
+    const idx = Number(e.target.dataset.index), value = Number(e.target.value);
+    if(balanceEditing().groups[idx]) editBalanceVersion(gs=>{ gs[idx].target = value; });
     return;
   }
 }

@@ -1266,3 +1266,38 @@ html[data-design="cute"].dark{ --bal-1:#F0A0B6; --bal-2:#8FC0E8; }
 .balance-sum.ok{ color:var(--color-ok); } .balance-sum.warn{ color:var(--color-warn); }
 .balance-actions{ display:flex; gap:var(--sp-2); flex-wrap:wrap; }
 .balance-actions .ghost-btn{ flex:1 1 40%; margin:0; }
+
+/* Week navigation + balance period row */
+.week-back{ margin:0 0 var(--sp-3); min-height:36px; padding:0 var(--sp-3); border:0; border-radius:var(--radius-pill); background:var(--color-primary-soft); color:var(--color-text); font:inherit; font-size:var(--fs-caption); font-weight:700; cursor:pointer; }
+.iconbtn.is-disabled{ opacity:.35; pointer-events:none; }
+.balance-period-row{ display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); margin-bottom:var(--sp-2); }
+.balance-period-label{ font-size:var(--fs-body-lg); font-weight:900; color:var(--color-text); }
+
+/* Tappable week bars + the day breakdown under them */
+button.wcol{ background:transparent; border:0; padding:var(--sp-1) 0; font:inherit; color:inherit; cursor:pointer; min-width:0; border-radius:var(--radius-sm); }
+button.wcol:active{ transform:scale(.96); }
+button.wcol.selected{ background:var(--color-primary-soft); box-shadow:0 0 0 2px var(--color-primary); }
+button.wcol.selected .wlabel{ color:var(--color-primary); }
+.week-hint{ margin-top:var(--sp-3); text-align:center; font-size:var(--fs-caption); color:var(--color-faint); }
+.day-detail{ margin-top:var(--sp-4); padding:var(--sp-3) var(--sp-4); border-radius:var(--radius-sm); background:var(--color-surface-soft); }
+.day-detail-head{ display:flex; align-items:baseline; justify-content:space-between; gap:var(--sp-2); margin-bottom:var(--sp-2); }
+.day-detail-title{ font-size:var(--fs-body); font-weight:700; color:var(--color-muted); }
+.day-detail-total{ font-size:var(--fs-title); font-weight:900; color:var(--color-text); text-align:right; }
+.day-detail-total small{ font-size:var(--fs-caption); font-weight:500; color:var(--color-muted); }
+
+/* Balance setup history */
+.balance-history{ display:flex; flex-direction:column; gap:var(--sp-2); }
+.balance-history-row{ display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-2) var(--sp-3); border-radius:var(--radius-sm); background:var(--color-surface-soft); }
+.balance-history-main{ flex:1; min-width:0; }
+.balance-history-date{ font-size:var(--fs-body); font-weight:700; color:var(--color-text); }
+.balance-history-sum{ font-size:var(--fs-caption); color:var(--color-muted); line-height:1.6; overflow-wrap:anywhere; }
+
+.balance-history-hint{ margin-top:var(--sp-1); font-size:var(--fs-caption); color:var(--color-faint); line-height:1.6; }
+.balance-from-field{ margin-top:var(--sp-2); min-height:var(--tap); justify-content:space-between; }
+.balance-period-fields{ display:flex; flex-wrap:wrap; gap:var(--sp-2); }
+.balance-period-fields .balance-from-field{ flex:1 1 auto; }
+.balance-apply-row{ display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-2); }
+.balance-apply-row .date-field{ flex:1 1 auto; min-height:var(--tap); justify-content:space-between; }
+.balance-editing-banner{ padding:var(--sp-3) var(--sp-4); border-radius:var(--radius-sm); background:var(--color-primary-soft); border:2px solid var(--color-primary); }
+.balance-editing-title{ font-size:var(--fs-body); font-weight:900; color:var(--color-text); }
+.balance-history-row.editing{ box-shadow:0 0 0 2px var(--color-primary); }
