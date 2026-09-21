@@ -159,13 +159,13 @@ html[data-design="cute"]{
   --font-display:'Zen Maru Gothic','Hiragino Maru Gothic ProN','Zen Kaku Gothic New',sans-serif;
 
   --color-bg:#F9EEEE;
-  --page-bg:linear-gradient(160deg,#FCEFEF 0%,#F8EDE6 45%,#EAF2FA 100%);
+  --page-bg:linear-gradient(160deg,#F8D3D9 0%,#F8DDCB 38%,#D3E3F4 100%);
   --phone-bg:transparent;
   --color-surface:#FFF9F8;
   --color-surface-soft:#F8ECEC;
-  --card-bg:#FBF1F1;
-  --card-border:0 solid transparent;
-  --card-shadow:9px 9px 22px rgba(214,165,172,.30), -7px -7px 18px rgba(255,255,255,.95);
+  --card-bg:linear-gradient(145deg,#FFFBF9 0%,#FCEFEC 100%);
+  --card-border:1px solid rgba(255,255,255,.9);
+  --card-shadow:0 2px 0 rgba(255,255,255,.95) inset, 0 0 0 1px rgba(120,80,90,.06), 0 6px 10px rgba(110,70,82,.16), 0 22px 38px -6px rgba(110,70,82,.38), -10px 4px 18px -4px rgba(110,70,82,.30), 10px 4px 18px -4px rgba(110,70,82,.24), 0 0 26px rgba(110,70,82,.16);
   --card-blur:none;
   --color-text:#4A3B42;
   --color-muted:#735D69;
@@ -184,12 +184,12 @@ html[data-design="cute"]{
 
   --radius-sm:14px; --radius-md:22px; --radius-lg:30px; --radius-btn:999px; --radius-pill:999px;
   --phone-radius:36px;
-  --shadow-sm:4px 4px 10px rgba(214,165,172,.30), -3px -3px 8px rgba(255,255,255,.95);
-  --shadow-md:10px 10px 24px rgba(214,165,172,.32), -8px -8px 20px rgba(255,255,255,.95);
+  --shadow-sm:0 2px 4px rgba(110,70,82,.18), 0 8px 16px -2px rgba(110,70,82,.28), 0 0 10px rgba(110,70,82,.10);
+  --shadow-md:0 6px 10px rgba(110,70,82,.18), 0 22px 40px -6px rgba(110,70,82,.40), -10px 4px 18px -4px rgba(110,70,82,.30), 10px 4px 18px -4px rgba(110,70,82,.24), 0 0 28px rgba(110,70,82,.16);
   --shadow-primary:0 10px 20px -8px rgba(184,86,115,.55);
-  --input-bg:#FBF1F1;
+  --input-bg:#F9E9E7;
   --input-border:transparent;
-  --input-shadow:inset 3px 3px 7px rgba(214,165,172,.30), inset -3px -3px 7px rgba(255,255,255,.9);
+  --input-shadow:inset 3px 4px 8px rgba(110,70,82,.30), inset -2px -2px 6px rgba(255,255,255,.95);
 
   --btn-primary-bg:linear-gradient(135deg,#C4607D,#D9819A);
   --btn-danger-bg:linear-gradient(135deg,#C4664A,#E0866A);
@@ -197,7 +197,7 @@ html[data-design="cute"]{
   --grad-ok:linear-gradient(90deg,#8FD3C1,#6CB9E0);
   --grad-level:linear-gradient(90deg,#F6B7A0,#F2A0B5);
 
-  --hero-bg:linear-gradient(150deg,#FFE2E8 0%,#FCEBE2 50%,#E1EDF9 100%);
+  --hero-bg:linear-gradient(140deg,#FFC2CE 0%,#FFD6BF 48%,#B9D6F3 100%);
   --hero-border:0 solid transparent;
   --hero-text:#4A3B42;
   --hero-muted:#735D69;
@@ -207,16 +207,16 @@ html[data-design="cute"]{
   --hero-chip-bg:rgba(255,255,255,.7);
   --hero-chip-text:#A64A66;
   --hero-deco:rgba(255,255,255,.45);
-  --hero-shadow:10px 10px 26px rgba(214,165,172,.34), -8px -8px 20px rgba(255,255,255,.95);
+  --hero-shadow:0 2px 0 rgba(255,255,255,.85) inset, 0 8px 12px rgba(110,70,82,.20), 0 28px 48px -8px rgba(110,70,82,.46), -12px 6px 22px -4px rgba(110,70,82,.34), 12px 6px 22px -4px rgba(110,70,82,.28), 0 0 32px rgba(110,70,82,.20);
 
-  --nav-bg:#FBF1F1;
+  --nav-bg:linear-gradient(145deg,#FFFBF9,#FCEFEC);
   --nav-border:0 solid transparent;
-  --nav-shadow:8px 8px 20px rgba(214,165,172,.32), -6px -6px 16px rgba(255,255,255,.95);
+  --nav-shadow:0 6px 10px rgba(110,70,82,.20), 0 20px 34px -6px rgba(110,70,82,.44), -10px 4px 18px -4px rgba(110,70,82,.32), 10px 4px 18px -4px rgba(110,70,82,.26), 0 0 24px rgba(110,70,82,.18);
   --nav-blur:none;
   --nav-active-bg:#FBE1E7;
   --nav-active-text:#A64A66;
 
-  --mesh-a:#FBD3DC; --mesh-b:#D6E6F5; --mesh-c:#FCE3CF; --mesh-opacity:.65;
+  --mesh-a:#F7A9BA; --mesh-b:#A9CDF0; --mesh-c:#FAC49A; --mesh-opacity:.9;
 }
 
 /* ---------- B: Soft Cute (dark) — dusty mauve ---------- */
