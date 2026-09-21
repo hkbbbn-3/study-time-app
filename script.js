@@ -462,7 +462,7 @@ function balanceAdvice(mins, groups){
 }
 
 function renderBalanceHome(){
-  if(!state.balance){
+  if(!state.balance || state.balance.enabled===false){
     return `
     <div class="card card--compact balance-invite">
       <div class="card-title icon-row">${icon('target',15)} 学習バランス</div>
@@ -1008,10 +1008,13 @@ function renderSettings(){
 
 function renderBalanceSettings(){
   const bal = state.balance;
-  if(!bal){
+  if(!bal || bal.enabled===false){
+    const hasSaved = !!bal; // switched off earlier: the groups, subjects and targets are still stored
     return `
-      <div class="balance-note" style="margin-top:0">科目をグループに分けて、時間の配分を目標と比べます（2〜${BALANCE_MAX_GROUPS}グループ）。日商簿記を含む科目は、自動で2つ目のグループに入ります（あとから変更できます）。</div>
-      <button class="submit-btn" style="margin-top:14px" data-action="balance-enable">バランスを見る設定を始める</button>`;
+      <div class="balance-note" style="margin-top:0">${hasSaved
+        ? 'バランス機能はオフです。前回の設定（グループ・科目・目標）は残してあるので、オンにするとそのまま復元されます。'
+        : `科目をグループに分けて、時間の配分を目標と比べます（2〜${BALANCE_MAX_GROUPS}グループ）。日商簿記を含む科目は、自動で2つ目のグループに入ります（あとから変更できます）。`}</div>
+      <button class="submit-btn" style="margin-top:14px" data-action="balance-enable">${hasSaved ? '前回の設定でバランスを見る' : 'バランスを見る設定を始める'}</button>`;
   }
   const groups = bal.groups;
   const sum = groups.reduce((a,g)=>a+g.target, 0);
@@ -1323,7 +1326,8 @@ function onClick(e){
     render(); return;
   }
   if(action==='balance-enable'){
-    // Subjects mentioning 簿記 start in group 2, everything else in group 1; both can be changed afterwards.
+    if(state.balance){ state.balance.enabled = true; persist(); render(); return; } // restore the earlier settings
+    // First time: subjects mentioning 簿記 start in group 2, everything else in group 1; both can be changed afterwards.
     const isBookkeeping = s=>/簿記/.test(s.name);
     state.balance = { groups: [
       { name:'デジハリ', subjectIds: state.subjects.filter(s=>!isBookkeeping(s)).map(s=>s.id), target:50 },
@@ -1331,8 +1335,8 @@ function onClick(e){
     ] };
     persist(); render(); return;
   }
-  if(action==='balance-disable'){
-    state.balance = null;
+  if(action==='balance-disable' && state.balance){
+    state.balance.enabled = false; // keep groups, subjects and targets so turning it back on restores them
     persist(); render(); return;
   }
   if(action==='balance-add-group' && state.balance && state.balance.groups.length<BALANCE_MAX_GROUPS){
