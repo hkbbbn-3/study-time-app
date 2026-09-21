@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Study Time</title>
+<script>
+// Apply the saved design + light/dark before first paint so the page doesn't flash the default look.
+(function(){
+  try{
+    var d = JSON.parse(localStorage.getItem('study-app-data') || '{}');
+    var design = (d.design==='cute' || d.design==='sea' || d.design==='calm') ? d.design : 'calm';
+    document.documentElement.setAttribute('data-design', design);
+    if(d.theme==='dark') document.documentElement.classList.add('dark');
+  }catch(e){ document.documentElement.setAttribute('data-design','calm'); }
+})();
+</script>
 <link rel="stylesheet" href="style.css">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">

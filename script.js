@@ -53,9 +53,17 @@ let state = {
   ],
   records: [], // {id,date,subjectId,minutes,memo}
   goals: { weekday: 120, weekend: 240 },
-  theme: 'light',
+  theme: 'light',   // light / dark mode
+  design: 'calm',   // visual design: 'calm' | 'cute' | 'sea' (independent of light/dark)
   lastMemo: '', // pre-fills the memo field for the next new record
 };
+
+const DESIGNS = [
+  { id:'calm', name:'Calm Focus', desc:'落ち着いた上品なデザイン。ベージュ×セージグリーン', swatch:['#F3F0E9','#5E7857','#7A726A'] },
+  { id:'cute', name:'Soft Cute',  desc:'やわらかくてかわいい。淡いピンク×水色',           swatch:['#FBE1E7','#B85673','#D6E6F5'] },
+  { id:'sea',  name:'Deep Sea',   desc:'海から深海へ。青×シアンの世界観（ダークモード推奨）', swatch:['#0A3350','#38C6E8','#6C7CF0'] },
+];
+const DESIGN_IDS = DESIGNS.map(d=>d.id);
 
 let ui = {
   tab: 'home',
@@ -88,6 +96,15 @@ function fmtMin(total){
   if(m===0) return `${h}時間`;
   return `${h}時間${m}分`;
 }
+// Same as fmtMin, but splits number and unit into spans so the hero can render big numbers with small units.
+function fmtMinHtml(total){
+  total = Math.round(total);
+  const h = Math.floor(total/60), m = total%60;
+  const part = (n,u)=>`<span class="num">${n}</span><span class="unit">${u}</span>`;
+  if(h<=0) return part(m,'分');
+  if(m===0) return part(h,'時間');
+  return part(h,'時間') + part(m,'分');
+}
 function subjectById(id){ return state.subjects.find(s=>s.id===id) || {name:'(削除済み)', color:'#999'}; }
 function recordsOn(iso){ return state.records.filter(r=>r.date===iso); }
 function totalOn(iso){ return recordsOn(iso).reduce((a,r)=>a+r.minutes,0); }
@@ -105,7 +122,7 @@ function persist(){
   saveTimer=setTimeout(()=>{
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, lastMemo: state.lastMemo
+        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, design: state.design, lastMemo: state.lastMemo
       }));
     }catch(e){ console.error('save failed', e); showToast('保存に失敗しました'); }
   }, 150);
@@ -120,6 +137,7 @@ async function loadData(){
       if(parsed.records) state.records = parsed.records;
       if(parsed.goals) state.goals = parsed.goals;
       if(parsed.theme) state.theme = parsed.theme;
+      if(DESIGN_IDS.includes(parsed.design)) state.design = parsed.design; // older saves have no "design": keep the default
       if(parsed.lastMemo) state.lastMemo = parsed.lastMemo;
     }
   }catch(e){
@@ -129,8 +147,15 @@ async function loadData(){
   ui.form.memo = state.lastMemo || '';
 }
 
+// Two independent axes: data-design (calm/cute/sea) and the .dark class (light/dark mode).
 function applyTheme(){
-  document.documentElement.classList.toggle('dark', state.theme==='dark');
+  const root = document.documentElement;
+  root.classList.toggle('dark', state.theme==='dark');
+  root.setAttribute('data-design', state.design);
+  // keep the browser/PWA status bar colour in step with the page background
+  const meta = document.querySelector('meta[name="theme-color"]');
+  const bg = getComputedStyle(root).getPropertyValue('--color-bg').trim();
+  if(meta && bg) meta.setAttribute('content', bg);
 }
 
 // ---------- toast ----------
@@ -183,6 +208,15 @@ function render(){
   const tabIndex = TAB_ORDER.indexOf(ui.tab);
   root.innerHTML = `
     <div class="mesh"><span></span><span></span><span></span></div>
+    <!-- Deep Sea backdrop (visible only when data-design="sea"). Mounting points for future
+         scroll-depth effects: drive --depth (0..1) on <html>, animate .sea-particles, and drop the
+         diver / fish / jellyfish into .sea-slot elements. -->
+    <div class="sea-layers" aria-hidden="true">
+      <div class="sea-gradient"></div>
+      <div class="sea-light"></div>
+      <div class="sea-particles"></div>
+      <div class="sea-slot sea-slot--diver" data-slot="diver"></div>
+    </div>
     <div class="phone">
       <div class="topbar">
         <div class="brand">
@@ -445,60 +479,56 @@ function renderHome(){
         </div>
         <div class="streak-chip">${icon('flame',13)} ${streak}日</div>
       </div>
-      <div class="ring-wrap">
-        <svg width="132" height="132" viewBox="0 0 110 110">
-          <circle cx="55" cy="55" r="${r}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="10"/>
-          <circle cx="55" cy="55" r="${r}" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round"
-            stroke-dasharray="${c}" stroke-dashoffset="${c-dash}" transform="rotate(-90 55 55)"
-            style="transition: stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)"/>
-        </svg>
-        <div class="ring-center">
-          <div class="ring-minutes">${pct}%</div>
-          <div class="ring-sub">${fmtMin(minutes)}</div>
+      <div class="hero-main">
+        <div class="hero-time">
+          <div class="hero-label">今日の学習時間</div>
+          <div class="hero-display">${fmtMinHtml(minutes)}</div>
+          <div class="hero-goal">${achieved ? '目標達成！おつかれさま' : (goal>0 ? `目標まであと ${fmtMin(goal-minutes)}` : '設定タブで目標を決めよう')}</div>
+        </div>
+        <div class="ring-wrap" role="img" aria-label="今日の目標達成率 ${pct}%">
+          <svg viewBox="0 0 110 110" aria-hidden="true">
+            <circle class="ring-track" cx="55" cy="55" r="${r}" fill="none" stroke-width="10"/>
+            <circle class="ring-fill" cx="55" cy="55" r="${r}" fill="none" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="${c}" stroke-dashoffset="${c-dash}" transform="rotate(-90 55 55)"
+              style="transition: stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)"/>
+          </svg>
+          <div class="ring-center">
+            <div class="ring-minutes">${pct}%</div>
+            <div class="ring-sub">達成率</div>
+          </div>
         </div>
       </div>
       <div class="hero-foot">
-        <div><div class="val">${fmtMin(minutes)}</div><div class="lab">今日</div></div>
         <div><div class="val">${fmtMin(weekTotal)}</div><div class="lab">今週</div></div>
         <div><div class="val">${goal>0?fmtMin(goal):'未設定'}</div><div class="lab">今日の目標</div></div>
       </div>
     </div>
 
-    <div class="level-card">
-      <div class="level-badge">Lv.${computeLevel().level}</div>
-      <div class="level-mid">
-        <div class="level-top">
-          <span class="level-name">きょうも育成中</span>
-          <span class="level-remain">次のLvまで ${fmtMin(computeLevel().remain)}</span>
-        </div>
-        <div class="bar-track"><div class="bar-fill level-fill" style="width:${computeLevel().pct}%"></div></div>
-      </div>
-    </div>
-
+    <div class="section-label">今週</div>
     <div class="card">
       <div class="card-title icon-row">${icon('trending',15)} 今週の推移</div>
       <div class="weekstrip">${weekHtml}</div>
-    </div>
-
-    <div class="card">
-      <div class="card-title icon-row">${icon('trending',15)} 週間比較</div>
-      <div class="compare-row">
-        <div class="compare-side">
-          <div class="compare-label">先週（同期間）</div>
-          <div class="compare-val">${fmtMin(lastWeekSameRange)}</div>
+      <div class="week-compare">
+        <div class="card-title icon-row">${icon('trending',15)} 週間比較</div>
+        <div class="compare-row">
+          <div class="compare-side">
+            <div class="compare-label">先週（同期間）</div>
+            <div class="compare-val">${fmtMin(lastWeekSameRange)}</div>
+          </div>
+          <div class="compare-badge ${cmp.cls}">${icon(cmp.icon,12)} ${cmp.label}</div>
+          <div class="compare-side right">
+            <div class="compare-label">今週</div>
+            <div class="compare-val">${fmtMin(thisWeekSoFar)}</div>
+          </div>
         </div>
-        <div class="compare-badge ${cmp.cls}">${icon(cmp.icon,12)} ${cmp.label}</div>
-        <div class="compare-side right">
-          <div class="compare-label">今週</div>
-          <div class="compare-val">${fmtMin(thisWeekSoFar)}</div>
-        </div>
+        <div class="compare-note">${cmp.note}</div>
       </div>
-      <div class="compare-note">${cmp.note}</div>
     </div>
 
+    <div class="section-label">今月</div>
     <div class="card">
-      <div class="cal-head" style="margin-bottom:10px;">
-        <div class="cal-title" style="font-size:14px;">${y}年${m+1}月${isCurrentMonth?'（今月）':''}</div>
+      <div class="cal-head" style="margin-bottom:var(--sp-3);">
+        <div class="cal-title">${y}年${m+1}月${isCurrentMonth?'（今月）':''}</div>
         <div class="cal-nav">
           <div class="iconbtn" data-action="home-prev-month" role="button" tabindex="0" aria-label="前の月">${icon('chevronLeft',16)}</div>
           <div class="iconbtn" data-action="home-next-month" role="button" tabindex="0" aria-label="次の月">${icon('chevronRight',16)}</div>
@@ -509,23 +539,23 @@ function renderHome(){
         <div class="n">${fmtMin(monthTotal)}（目標 ${fmtMin(monthGoal)}）</div>
       </div>
       <div class="bar-track"><div class="bar-fill" style="width:${monthPct}%"></div></div>
+      <div class="month-breakdown">
+        <div class="card-title icon-row">${icon('book',15)} 科目ごとの合計（${y}年${m+1}月）</div>
+        ${subjEntries.length ? subjEntries.map(([sid,min])=>{
+          const s = subjectById(sid);
+          const w = Math.round((min/maxSubj)*100);
+          return `<div class="subj-row">
+            <div class="subj-dot" style="background:${s.color}"></div>
+            <div class="subj-name">${escapeHtml(s.name)}</div>
+            <div class="subj-min">${fmtMin(min)}</div>
+          </div>
+          <div class="bar-track" style="height:6px; margin-bottom:2px;"><div class="bar-fill" style="width:${w}%; background:${s.color}"></div></div>`;
+        }).join('') : `<div class="empty">まだ記録がありません<br>「記録」タブから始めてみよう</div>`}
+      </div>
     </div>
 
-    <div class="card">
-      <div class="card-title icon-row">${icon('book',15)} 科目ごとの合計（${y}年${m+1}月）</div>
-      ${subjEntries.length ? subjEntries.map(([sid,min])=>{
-        const s = subjectById(sid);
-        const w = Math.round((min/maxSubj)*100);
-        return `<div class="subj-row">
-          <div class="subj-dot" style="background:${s.color}"></div>
-          <div class="subj-name">${escapeHtml(s.name)}</div>
-          <div class="subj-min">${fmtMin(min)}</div>
-        </div>
-        <div class="bar-track" style="height:6px; margin-bottom:2px;"><div class="bar-fill" style="width:${w}%; background:${s.color}"></div></div>`;
-      }).join('') : `<div class="empty">まだ記録がありません<br>「記録」タブから始めてみよう</div>`}
-    </div>
-
-    <div class="card">
+    <div class="section-label">その他の統計</div>
+    <div class="card card--compact">
       <div class="card-title icon-row">${icon('trending',15)} これまでの記録</div>
       <div class="alltime-stats">
         <div class="alltime-stat">
@@ -540,6 +570,17 @@ function renderHome(){
           <div class="v">${allTime.firstDateLabel}</div>
           <div class="l">はじめた日</div>
         </div>
+      </div>
+    </div>
+
+    <div class="level-card">
+      <div class="level-badge">Lv.${computeLevel().level}</div>
+      <div class="level-mid">
+        <div class="level-top">
+          <span class="level-name">きょうも育成中</span>
+          <span class="level-remain">次のLvまで ${fmtMin(computeLevel().remain)}</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill level-fill" style="width:${computeLevel().pct}%"></div></div>
       </div>
     </div>
 
@@ -768,7 +809,21 @@ function renderSettings(){
   const minOptions = [0,30];
 
   return `
+    <div class="section-label icon-row" style="justify-content:flex-start; margin-top:var(--sp-2);">${icon('sliders',13)} デザイン</div>
     <div class="card">
+      <div class="design-grid" role="radiogroup" aria-label="デザイン">
+        ${DESIGNS.map(d=>`
+          <button type="button" class="design-option" role="radio" aria-checked="${state.design===d.id}" data-action="set-design" data-design="${d.id}">
+            <span class="design-swatch" aria-hidden="true">${d.swatch.map(c=>`<i style="background:${c}"></i>`).join('')}</span>
+            <span class="design-meta">
+              <div class="design-name">${d.name}</div>
+              <div class="design-desc">${d.desc}</div>
+            </span>
+            <span class="design-check" aria-hidden="true">${icon('check',20)}</span>
+          </button>
+        `).join('')}
+      </div>
+      <div class="divider"></div>
       <div class="toggle-row">
         <div class="t icon-row" style="justify-content:flex-start">${icon('moon',16)} ダークモード</div>
         <div class="switch ${state.theme==='dark'?'on':''}" data-action="toggle-theme-switch" role="switch" aria-checked="${state.theme==='dark'}" aria-label="ダークモード" tabindex="0"><div class="knob"></div></div>
@@ -906,6 +961,16 @@ function onClick(e){
     applyTheme();
     persist();
     render();
+    return;
+  }
+  if(action==='set-design'){
+    const id = btn.dataset.design;
+    if(DESIGN_IDS.includes(id) && id!==state.design){
+      state.design = id;
+      applyTheme();
+      persist();
+      render();
+    }
     return;
   }
   if(action==='prev-month'){
