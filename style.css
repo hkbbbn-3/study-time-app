@@ -1329,3 +1329,9 @@ html[data-design="neon"] .color-swatch,
 html[data-design="violet"] .color-swatch{ box-shadow:0 0 10px -1px var(--pc); }
 html[data-design="neon"] .color-swatch.selected,
 html[data-design="violet"] .color-swatch.selected{ box-shadow:0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary), 0 0 14px var(--pc); }
+
+/* Neon designs: lighter to scroll on laptops with integrated graphics.
+   Cards and the nav are nearly opaque, so the backdrop blur is barely visible but is
+   re-computed on every scroll frame; the soft background blobs are faint, so they stay still. */
+html[data-design="neon"], html[data-design="violet"]{ --card-blur:none; --nav-blur:none; }
+html[data-design="neon"] .mesh span, html[data-design="violet"] .mesh span{ animation:none; }
