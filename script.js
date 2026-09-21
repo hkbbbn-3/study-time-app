@@ -1540,6 +1540,16 @@ function onClick(e){
       ui.form.subjectIds = ui.form.subjectIds.filter(id=>id!==c.actionId);
       persist();
       showToast('科目を削除しました');
+    } else if(c && c.actionType==='balance-version' && state.balance && state.balance.versions.length>1){
+      state.balance.versions.splice(c.actionId, 1);
+      ui.balanceEditIdx = null;
+      persist();
+      showToast('履歴から削除しました');
+    } else if(c && c.actionType==='balance-group' && state.balance && balanceEditing().groups[c.actionId] && balanceEditing().groups.length>BALANCE_MIN_GROUPS){
+      editBalanceVersion(gs=>{
+        gs.splice(c.actionId, 1);
+        evenTargets(gs.length).forEach((t,i)=>{ gs[i].target = t; });
+      });
     } else if(c && c.actionType==='import' && pendingImport){
       const result = pendingImport;
       state.subjects = result.subjects;
@@ -1611,10 +1621,9 @@ function onClick(e){
     return;
   }
   if(action==='balance-remove-group' && state.balance && balanceEditing().groups.length>BALANCE_MIN_GROUPS){
-    editBalanceVersion(gs=>{
-      gs.splice(Number(btn.dataset.index), 1);
-      evenTargets(gs.length).forEach((t,i)=>{ gs[i].target = t; });
-    });
+    const g = balanceEditing().groups[Number(btn.dataset.index)];
+    if(!g) return;
+    openConfirm(`グループ「${g.name}」を削除しますか？`, 'このグループに入れていた科目は「グループ未設定」になります。目標の割合は、残りのグループで均等に振り直されます。', 'balance-group', Number(btn.dataset.index));
     return;
   }
   if(action==='balance-equalize' && state.balance){
@@ -1634,9 +1643,10 @@ function onClick(e){
     return;
   }
   if(action==='balance-delete-version' && state.balance && state.balance.versions.length>1){
-    state.balance.versions.splice(Number(btn.dataset.index), 1);
-    ui.balanceEditIdx = null;
-    persist(); render(); showToast('履歴から削除しました'); return;
+    const idx = Number(btn.dataset.index);
+    if(!state.balance.versions[idx]) return;
+    openConfirm(`「${balancePeriodLabel(idx).text}」の設定を、履歴から削除しますか？`, `その期間は、${idx>0 ? '前' : '次'}の設定で計算し直されます。この操作は取り消せません。`, 'balance-version', idx);
+    return;
   }
   if(action==='export-json'){ exportJson(); return; }
   if(action==='export-csv'){ exportCsv(); return; }
