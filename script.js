@@ -54,13 +54,15 @@ let state = {
   records: [], // {id,date,subjectId,minutes,memo}
   goals: { weekday: 120, weekend: 240 },
   theme: 'light',   // light / dark mode
-  design: 'calm',   // visual design: 'calm' | 'cute' | 'sea' (independent of light/dark)
+  design: 'calm',   // visual design: 'calm' | 'cute' | 'neon' | 'violet' | 'sea' (independent of light/dark)
   lastMemo: '', // pre-fills the memo field for the next new record
 };
 
 const DESIGNS = [
   { id:'calm', name:'Calm Focus', desc:'落ち着いた上品なデザイン。ベージュ×セージグリーン', swatch:['#F3F0E9','#5E7857','#7A726A'] },
   { id:'cute', name:'Soft Cute',  desc:'やわらかくてかわいい。淡いピンク×水色',           swatch:['#FBE1E7','#B85673','#D6E6F5'] },
+  { id:'neon', name:'Neon Pop',   desc:'ネオンピンク×ネオンブルー。光るポップな夜のデザイン', swatch:['#160B2E','#FF3EA5','#27D8FF'] },
+  { id:'violet', name:'Neon Violet', desc:'ビビッドな紫×マゼンタ。絵の具が弾けるアートなネオン', swatch:['#3A10B5','#FF2FA8','#9DB2FF'] },
   { id:'sea',  name:'Deep Sea',   desc:'海から深海へ。青×シアンの世界観（ダークモード推奨）', swatch:['#0A3350','#38C6E8','#6C7CF0'] },
 ];
 const DESIGN_IDS = DESIGNS.map(d=>d.id);
@@ -147,7 +149,7 @@ async function loadData(){
   ui.form.memo = state.lastMemo || '';
 }
 
-// Two independent axes: data-design (calm/cute/sea) and the .dark class (light/dark mode).
+// Two independent axes: data-design (calm/cute/neon/violet/sea) and the .dark class (light/dark mode).
 function applyTheme(){
   const root = document.documentElement;
   root.classList.toggle('dark', state.theme==='dark');

@@ -268,6 +268,230 @@ html[data-design="cute"].dark{
   --mesh-a:#5A3346; --mesh-b:#2F3F5E; --mesh-c:#4A3A3A; --mesh-opacity:.5;
 }
 
+/* ---------- Neon Pop: neon pink + neon blue with glowing edges. Dark = night city, light = white with neon accents ---------- */
+html[data-design="neon"]{
+  --font-body:'Zen Maru Gothic','Hiragino Maru Gothic ProN','Zen Kaku Gothic New',sans-serif;
+  --font-display:'Zen Maru Gothic','Zen Kaku Gothic New',sans-serif;
+  --radius-sm:14px; --radius-md:20px; --radius-lg:28px; --radius-btn:16px; --radius-pill:999px;
+  --phone-radius:36px;
+  --phone-bg:transparent;
+  --card-blur:none; --nav-blur:blur(14px);
+  --overlay-blur:blur(6px);
+  --btn-primary-bg:linear-gradient(135deg,#FF3EA5,#7A5CFF 55%,#27D8FF);
+  --btn-danger-bg:linear-gradient(135deg,#FF5C7A,#FF8A5C);
+}
+html[data-design="neon"].dark{
+  color-scheme:dark;
+  --color-bg:#0E0820;
+  --page-bg:radial-gradient(120% 60% at 0% 0%,rgba(255,62,165,.22),transparent 60%), radial-gradient(120% 60% at 100% 100%,rgba(39,216,255,.20),transparent 60%), linear-gradient(180deg,#160B2E 0%,#0E0820 100%);
+  --color-surface:#1B1236;
+  --color-surface-soft:#170F2E;
+  --card-bg:linear-gradient(160deg,rgba(38,22,72,.92),rgba(22,13,46,.92));
+  --card-border:1px solid rgba(255,110,205,.8);
+  --card-shadow:inset 0 0 14px rgba(255,62,165,.16), 0 0 10px rgba(255,62,165,.65), 0 0 28px rgba(255,62,165,.42), 0 0 44px rgba(39,216,255,.40), 0 14px 30px -12px rgba(0,0,0,.7);
+  --color-text:#F6EEFF;
+  --color-muted:#C7B5E6;
+  --color-faint:#9C88C4;
+  --color-line:rgba(190,150,255,.24);
+  --color-primary:#FF5CB8;
+  --color-primary-2:#27D8FF;
+  --color-on-primary:#1A0630;
+  --color-primary-soft:rgba(255,62,165,.18);
+  --color-warn:#FFB35C;
+  --color-warn-soft:rgba(255,179,92,.14);
+  --color-ok:#3DF0C8;
+  --color-ok-soft:rgba(61,240,200,.14);
+  --color-overlay:rgba(6,2,16,.7);
+  --shadow-sm:0 0 10px rgba(255,62,165,.6), 0 0 22px rgba(39,216,255,.3);
+  --shadow-md:0 0 14px rgba(255,62,165,.6), 0 0 34px rgba(39,216,255,.4), 0 16px 34px -14px rgba(0,0,0,.7);
+  --shadow-primary:0 0 16px rgba(255,62,165,.85), 0 0 34px rgba(255,62,165,.5), 0 0 42px rgba(39,216,255,.45);
+  --input-bg:rgba(12,6,28,.7);
+  --input-border:rgba(70,225,255,.85);
+  --input-shadow:inset 0 0 14px rgba(39,216,255,.18), 0 0 10px rgba(39,216,255,.30);
+  --grad-bar:linear-gradient(180deg,#27D8FF,#FF3EA5);
+  --grad-ok:linear-gradient(90deg,#3DF0C8,#27D8FF);
+  --grad-level:linear-gradient(90deg,#FF3EA5,#27D8FF);
+  --hero-bg:linear-gradient(140deg,#5A1E9E 0%,#C42A8E 48%,#1F8FE0 100%);
+  --hero-border:1px solid rgba(255,255,255,.6);
+  --hero-text:#FFFFFF;
+  --hero-muted:rgba(255,255,255,.88);
+  --hero-track:rgba(255,255,255,.22);
+  --hero-ring:#7DF0FF;
+  --hero-divider:rgba(255,255,255,.24);
+  --hero-chip-bg:rgba(255,255,255,.2);
+  --hero-chip-text:#FFFFFF;
+  --hero-deco:rgba(255,255,255,.10);
+  --hero-shadow:0 0 14px rgba(255,90,190,.85), 0 0 40px rgba(255,62,165,.6), 0 0 64px rgba(39,216,255,.55), 0 18px 36px -14px rgba(0,0,0,.7);
+  --nav-bg:rgba(24,13,50,.86);
+  --nav-border:1px solid rgba(255,110,205,.8);
+  --nav-shadow:0 0 12px rgba(255,62,165,.65), 0 0 32px rgba(255,62,165,.35), 0 0 40px rgba(39,216,255,.4), 0 12px 26px -10px rgba(0,0,0,.7);
+  --nav-active-bg:rgba(255,62,165,.20);
+  --nav-active-text:#FF9BDA;
+  --mesh-a:#FF3EA5; --mesh-b:#27D8FF; --mesh-c:#7A5CFF; --mesh-opacity:.26;
+}
+html[data-design="neon"]:not(.dark){
+  color-scheme:light;
+  --color-bg:#F6F1FF;
+  --page-bg:radial-gradient(110% 55% at 0% 0%,rgba(255,62,165,.26),transparent 60%), radial-gradient(110% 55% at 100% 100%,rgba(39,216,255,.30),transparent 60%), linear-gradient(180deg,#FBF4FF 0%,#EEF6FF 100%);
+  --color-surface:#FFFFFF;
+  --color-surface-soft:#F6EEFC;
+  --card-bg:linear-gradient(160deg,#FFFFFF,#FBF5FF);
+  --card-border:1px solid rgba(255,62,165,.42);
+  --card-shadow:0 0 0 1px rgba(39,216,255,.16), 0 0 20px -4px rgba(255,62,165,.34), 0 0 28px -8px rgba(39,216,255,.36), 0 14px 26px -12px rgba(90,40,120,.28);
+  --color-text:#2A1148;
+  --color-muted:#5E4A80;
+  --color-faint:#725E94;
+  --color-line:rgba(120,80,190,.20);
+  --color-primary:#D81B8A;
+  --color-primary-2:#0BA5D6;
+  --color-on-primary:#FFFFFF;
+  --color-primary-soft:rgba(255,62,165,.12);
+  --color-warn:#B4501F;
+  --color-warn-soft:#FDE9DA;
+  --color-ok:#0E8F73;
+  --color-ok-soft:#D9F6EE;
+  --color-overlay:rgba(30,10,60,.45);
+  --shadow-sm:0 0 12px -4px rgba(255,62,165,.4), 0 5px 12px -6px rgba(90,40,120,.3);
+  --shadow-md:0 0 22px -6px rgba(255,62,165,.42), 0 14px 28px -12px rgba(90,40,120,.34);
+  --shadow-primary:0 0 20px -3px rgba(255,62,165,.6), 0 0 26px -8px rgba(39,216,255,.5);
+  --input-bg:#FFFFFF;
+  --input-border:rgba(11,165,214,.55);
+  --input-shadow:inset 0 0 10px rgba(39,216,255,.12);
+  --grad-bar:linear-gradient(180deg,#27D8FF,#FF3EA5);
+  --grad-ok:linear-gradient(90deg,#1CCBA8,#27D8FF);
+  --grad-level:linear-gradient(90deg,#FF3EA5,#27D8FF);
+  --hero-bg:linear-gradient(140deg,#7A3CE0 0%,#F0339E 48%,#25B5F0 100%);
+  --hero-border:1px solid rgba(255,255,255,.55);
+  --hero-text:#FFFFFF;
+  --hero-muted:rgba(255,255,255,.94);
+  --hero-track:rgba(255,255,255,.3);
+  --hero-ring:#FFFFFF;
+  --hero-divider:rgba(255,255,255,.3);
+  --hero-chip-bg:rgba(255,255,255,.24);
+  --hero-chip-text:#FFFFFF;
+  --hero-deco:rgba(255,255,255,.14);
+  --hero-shadow:0 0 28px -2px rgba(255,62,165,.5), 0 0 40px -8px rgba(39,216,255,.5), 0 18px 32px -14px rgba(90,40,120,.45);
+  --nav-bg:rgba(255,255,255,.9);
+  --nav-border:1px solid rgba(255,62,165,.42);
+  --nav-shadow:0 0 20px -4px rgba(255,62,165,.4), 0 0 26px -8px rgba(39,216,255,.4), 0 12px 24px -10px rgba(90,40,120,.3);
+  --nav-active-bg:rgba(255,62,165,.14);
+  --nav-active-text:#B8147A;
+  --mesh-a:#FFA8D6; --mesh-b:#9BE6FF; --mesh-c:#C9B4FF; --mesh-opacity:.5;
+}
+
+/* ---------- Neon Violet: electric violet + hot magenta, paint-splash feel (deep saturated purple instead of black) ---------- */
+html[data-design="violet"]{
+  --font-body:'Zen Kaku Gothic New','Hiragino Sans','Noto Sans JP',sans-serif;
+  --font-display:'Zen Maru Gothic','Zen Kaku Gothic New',sans-serif;
+  --radius-sm:12px; --radius-md:18px; --radius-lg:26px; --radius-btn:14px; --radius-pill:999px;
+  --phone-radius:34px;
+  --phone-bg:transparent;
+  --card-blur:blur(10px) saturate(1.3); --nav-blur:blur(16px) saturate(1.3);
+  --overlay-blur:blur(6px);
+  --btn-primary-bg:linear-gradient(135deg,#FF2FA8,#8B3DFF);
+  --btn-danger-bg:linear-gradient(135deg,#FF4D7A,#FF8A5C);
+}
+html[data-design="violet"].dark{
+  color-scheme:dark;
+  --color-bg:#1E0764;
+  --page-bg:radial-gradient(70% 45% at 0% 30%,rgba(255,47,168,.55),transparent 65%), radial-gradient(65% 45% at 100% 55%,rgba(255,47,168,.50),transparent 65%), radial-gradient(60% 40% at 100% 6%,rgba(120,150,255,.35),transparent 65%), radial-gradient(70% 40% at 20% 100%,rgba(255,47,168,.30),transparent 65%), linear-gradient(170deg,#3A10B5 0%,#2A0A8C 45%,#1A0558 100%);
+  --color-surface:#2C0E8A;
+  --color-surface-soft:#260C78;
+  --card-bg:linear-gradient(160deg,rgba(74,34,190,.62),rgba(40,14,120,.66));
+  --card-border:1px solid rgba(190,170,255,.42);
+  --card-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 0 22px -6px rgba(255,47,168,.5), 0 16px 32px -14px rgba(10,0,50,.7);
+  --color-text:#FBF7FF;
+  --color-muted:#D2C8FF;
+  --color-faint:#A99BE8;
+  --color-line:rgba(190,170,255,.28);
+  --color-primary:#FF5CC0;
+  --color-primary-2:#9DB2FF;
+  --color-on-primary:#22004F;
+  --color-primary-soft:rgba(255,92,192,.20);
+  --color-warn:#FFC07A;
+  --color-warn-soft:rgba(255,192,122,.16);
+  --color-ok:#6DF2D0;
+  --color-ok-soft:rgba(109,242,208,.16);
+  --color-overlay:rgba(12,0,48,.7);
+  --shadow-sm:0 0 12px -3px rgba(255,47,168,.5), 0 6px 14px -6px rgba(10,0,50,.6);
+  --shadow-md:0 0 24px -6px rgba(255,47,168,.55), 0 16px 34px -14px rgba(10,0,50,.7);
+  --shadow-primary:0 0 20px -2px rgba(255,47,168,.75), 0 0 30px -6px rgba(140,110,255,.6);
+  --input-bg:rgba(24,6,80,.62);
+  --input-border:rgba(190,170,255,.6);
+  --input-shadow:inset 0 0 12px rgba(157,178,255,.14);
+  --grad-bar:linear-gradient(180deg,#A9B8FF,#FF2FA8);
+  --grad-ok:linear-gradient(90deg,#6DF2D0,#9DB2FF);
+  --grad-level:linear-gradient(90deg,#FF2FA8,#9DB2FF);
+  --hero-bg:linear-gradient(140deg,#5A22E8 0%,#D02A9E 50%,#8FA2FF 100%);
+  --hero-border:1px solid rgba(255,255,255,.4);
+  --hero-text:#FFFFFF;
+  --hero-muted:rgba(255,255,255,.9);
+  --hero-track:rgba(255,255,255,.24);
+  --hero-ring:#FFD3F0;
+  --hero-divider:rgba(255,255,255,.26);
+  --hero-chip-bg:rgba(255,255,255,.22);
+  --hero-chip-text:#FFFFFF;
+  --hero-deco:rgba(255,255,255,.10);
+  --hero-shadow:0 0 30px -4px rgba(255,47,168,.65), 0 20px 40px -14px rgba(10,0,50,.7);
+  --nav-bg:rgba(38,12,116,.82);
+  --nav-border:1px solid rgba(190,170,255,.45);
+  --nav-shadow:0 0 22px -4px rgba(255,47,168,.5), 0 12px 26px -10px rgba(10,0,50,.7);
+  --nav-active-bg:rgba(255,47,168,.24);
+  --nav-active-text:#FFB3E4;
+  --mesh-a:#FF2FA8; --mesh-b:#7A9BFF; --mesh-c:#8B3DFF; --mesh-opacity:.22;
+}
+html[data-design="violet"]:not(.dark){
+  color-scheme:light;
+  --color-bg:#EEE8FF;
+  --page-bg:radial-gradient(70% 40% at 0% 30%,rgba(255,47,168,.32),transparent 65%), radial-gradient(65% 40% at 100% 55%,rgba(255,47,168,.30),transparent 65%), radial-gradient(60% 40% at 100% 5%,rgba(120,150,255,.40),transparent 65%), linear-gradient(170deg,#F6F1FF 0%,#E6DEFF 100%);
+  --color-surface:#FFFFFF;
+  --color-surface-soft:#F1EBFF;
+  --card-bg:linear-gradient(160deg,rgba(255,255,255,.92),rgba(246,240,255,.9));
+  --card-border:1px solid rgba(139,61,255,.34);
+  --card-shadow:0 0 22px -6px rgba(139,61,255,.4), 0 14px 28px -12px rgba(60,20,140,.32);
+  --color-text:#22084F;
+  --color-muted:#56428C;
+  --color-faint:#6B579E;
+  --color-line:rgba(120,80,210,.22);
+  --color-primary:#C2137F;
+  --color-primary-2:#5A32D8;
+  --color-on-primary:#FFFFFF;
+  --color-primary-soft:rgba(255,47,168,.12);
+  --color-warn:#B4501F;
+  --color-warn-soft:#FDE9DA;
+  --color-ok:#0E8F73;
+  --color-ok-soft:#D9F6EE;
+  --color-overlay:rgba(30,10,70,.45);
+  --shadow-sm:0 0 12px -4px rgba(139,61,255,.38), 0 5px 12px -6px rgba(60,20,140,.32);
+  --shadow-md:0 0 22px -6px rgba(139,61,255,.4), 0 14px 28px -12px rgba(60,20,140,.36);
+  --shadow-primary:0 0 18px -3px rgba(255,47,168,.6), 0 0 24px -8px rgba(90,50,216,.5);
+  --input-bg:#FFFFFF;
+  --input-border:rgba(139,61,255,.5);
+  --input-shadow:inset 0 0 10px rgba(139,61,255,.08);
+  --grad-bar:linear-gradient(180deg,#8B9DFF,#FF2FA8);
+  --grad-ok:linear-gradient(90deg,#1CCBA8,#7B9BFF);
+  --grad-level:linear-gradient(90deg,#FF2FA8,#7B9BFF);
+  --hero-bg:linear-gradient(140deg,#6A30F0 0%,#DC34A8 50%,#9BAEFF 100%);
+  --hero-border:1px solid rgba(255,255,255,.5);
+  --hero-text:#FFFFFF;
+  --hero-muted:rgba(255,255,255,.94);
+  --hero-track:rgba(255,255,255,.28);
+  --hero-ring:#FFFFFF;
+  --hero-divider:rgba(255,255,255,.3);
+  --hero-chip-bg:rgba(255,255,255,.24);
+  --hero-chip-text:#FFFFFF;
+  --hero-deco:rgba(255,255,255,.14);
+  --hero-shadow:0 0 26px -4px rgba(255,47,168,.5), 0 18px 34px -14px rgba(60,20,140,.5);
+  --nav-bg:rgba(255,255,255,.9);
+  --nav-border:1px solid rgba(139,61,255,.36);
+  --nav-shadow:0 0 20px -4px rgba(139,61,255,.4), 0 12px 24px -10px rgba(60,20,140,.34);
+  --nav-active-bg:rgba(255,47,168,.14);
+  --nav-active-text:#A80F6C;
+  --mesh-a:#FFA0D8; --mesh-b:#A9BAFF; --mesh-c:#C7A9FF; --mesh-opacity:.5;
+}
+html[data-design="violet"] .ring-fill{ filter:drop-shadow(0 0 5px var(--hero-ring)); }
+html[data-design="violet"] .brand-mark{ box-shadow:0 0 14px rgba(255,47,168,.6), 0 0 20px rgba(139,61,255,.5); }
+
 /* ---------- C: Deep Sea (dark = the deep sea itself) ---------- */
 html[data-design="sea"]{
   --font-body:'Zen Kaku Gothic New','Hiragino Sans','Noto Sans JP',sans-serif;
@@ -981,3 +1205,9 @@ textarea{resize:none; min-height:88px; font-family:inherit;}
 @media (prefers-reduced-motion: reduce){
   .mesh span, .hero-achieved, .fade-in, .spinner, .sea-gradient{ animation:none; transition:none; }
 }
+
+/* Neon Pop: extra glow on key numbers, the ring and chart bars (decorative only) */
+html[data-design="neon"] .ring-fill{ filter:drop-shadow(0 0 5px var(--hero-ring)); }
+html[data-design="neon"].dark .hero-display .num{ text-shadow:0 0 10px rgba(255,255,255,.65), 0 0 24px rgba(255,120,210,.85), 0 0 40px rgba(39,216,255,.6); }
+html[data-design="neon"].dark .nav-active, html[data-design="neon"].dark .tabbar button.active{ text-shadow:0 0 10px rgba(255,90,190,.9); }
+html[data-design="neon"] .brand-mark{ box-shadow:0 0 14px rgba(255,62,165,.7), 0 0 22px rgba(39,216,255,.5); }

@@ -9,13 +9,13 @@
 (function(){
   try{
     var d = JSON.parse(localStorage.getItem('study-app-data') || '{}');
-    var design = (d.design==='cute' || d.design==='sea' || d.design==='calm') ? d.design : 'calm';
+    var design = (d.design==='cute' || d.design==='neon' || d.design==='violet' || d.design==='sea' || d.design==='calm') ? d.design : 'calm';
     document.documentElement.setAttribute('data-design', design);
     if(d.theme==='dark') document.documentElement.classList.add('dark');
   }catch(e){ document.documentElement.setAttribute('data-design','calm'); }
 })();
 </script>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=5">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
