@@ -989,6 +989,18 @@ textarea{resize:none; min-height:88px; font-family:inherit;}
 .subject-pill:active{transform:scale(.96);}
 .subject-pill .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
 .subject-pill.selected{color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.28); box-shadow:0 6px 14px -8px rgba(0,0,0,.35);}
+/* Neon designs: selected pills become tinted glass with a glowing edge instead of an opaque fill */
+html[data-design="neon"] .subject-pill.selected,
+html[data-design="violet"] .subject-pill.selected{
+  background:color-mix(in srgb, var(--pc) 24%, transparent) !important;
+  border-color:var(--pc) !important;
+  color:var(--color-text); text-shadow:none;
+  box-shadow:0 0 12px -2px var(--pc), inset 0 0 12px -4px var(--pc);
+}
+html[data-design="neon"] .subject-pill.selected .dot,
+html[data-design="violet"] .subject-pill.selected .dot{
+  background:var(--pc) !important; box-shadow:0 0 8px 1px var(--pc);
+}
 
 .submit-btn{
   width:100%; min-height:52px; padding:var(--sp-3) var(--sp-4); border:none; border-radius:var(--radius-btn); cursor:pointer;
@@ -1301,3 +1313,19 @@ button.wcol.selected .wlabel{ color:var(--color-primary); }
 .balance-editing-banner{ padding:var(--sp-3) var(--sp-4); border-radius:var(--radius-sm); background:var(--color-primary-soft); border:2px solid var(--color-primary); }
 .balance-editing-title{ font-size:var(--fs-body); font-weight:900; color:var(--color-text); }
 .balance-history-row.editing{ box-shadow:0 0 0 2px var(--color-primary); }
+
+/* Neon designs: give the remaining flat parts a glowing edge so nothing looks pasted on */
+html[data-design="neon"] .day-cell.selected,
+html[data-design="violet"] .day-cell.selected{ border-color:rgba(255,255,255,.75); box-shadow:0 0 14px 1px var(--color-primary), inset 0 0 10px -2px rgba(255,255,255,.6); }
+html[data-design="neon"] .wbar-track,
+html[data-design="violet"] .wbar-track{ border:1px solid color-mix(in srgb, var(--color-primary-2) 45%, transparent); box-shadow:inset 0 0 10px -4px var(--color-primary-2); }
+html[data-design="neon"] .wbar-fill,
+html[data-design="violet"] .wbar-fill{ box-shadow:0 0 12px -1px var(--color-primary); }
+html[data-design="neon"] .balance-history-row,
+html[data-design="violet"] .balance-history-row{ border:1px solid color-mix(in srgb, var(--color-primary-2) 45%, transparent); box-shadow:inset 0 0 12px -6px var(--color-primary-2); }
+html[data-design="neon"] .rec-badge,
+html[data-design="violet"] .rec-badge{ box-shadow:0 0 8px 0 var(--pc); }
+html[data-design="neon"] .color-swatch,
+html[data-design="violet"] .color-swatch{ box-shadow:0 0 10px -1px var(--pc); }
+html[data-design="neon"] .color-swatch.selected,
+html[data-design="violet"] .color-swatch.selected{ box-shadow:0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary), 0 0 14px var(--pc); }

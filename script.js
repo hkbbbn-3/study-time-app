@@ -364,7 +364,7 @@ function renderSubjectEditor(){
         <div class="field" style="text-align:left;">
           <label class="field-label">色</label>
           <div class="color-swatches">
-            ${SUBJECT_PALETTE.map(c=>`<div class="color-swatch ${c===se.color?'selected':''}" style="background:${c}" data-action="pick-subject-color" data-color="${c}" role="button" tabindex="0" aria-label="この色にする"></div>`).join('')}
+            ${SUBJECT_PALETTE.map(c=>`<div class="color-swatch ${c===se.color?'selected':''}" style="--pc:${c};background:${c}" data-action="pick-subject-color" data-color="${c}" role="button" tabindex="0" aria-label="この色にする"></div>`).join('')}
           </div>
         </div>
         <div class="modal-actions">
@@ -917,7 +917,7 @@ function renderHome(){
         <div class="subject-pill-grid">
           ${state.subjects.map(s=>{
             const selected = rangeSubjectIds.includes(s.id);
-            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-range-subject" data-id="${s.id}" style="${selected?`background:${s.color};border-color:${s.color};`:''}">
+            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-range-subject" data-id="${s.id}" style="--pc:${s.color};${selected?`background:${s.color};border-color:${s.color};`:''}">
               <span class="dot" style="background:${selected?'#fff':s.color}"></span>${escapeHtml(s.name)}
             </button>`;
           }).join('')}
@@ -1024,7 +1024,7 @@ function recordItemHtml(r){
   const s = subjectById(r.subjectId);
   return `
     <div class="record-item">
-      <div class="rec-badge" style="background:${s.color}"></div>
+      <div class="rec-badge" style="--pc:${s.color};background:${s.color}"></div>
       <div class="rec-body">
         <div class="rec-subject">${escapeHtml(s.name)}</div>
         ${r.memo ? `<div class="rec-memo">${escapeHtml(r.memo)}</div>` : ''}
@@ -1063,7 +1063,7 @@ function renderRecord(){
         <div class="subject-pill-grid">
           ${state.subjects.map(s=>{
             const selected = f.subjectIds.includes(s.id);
-            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-subject-select" data-id="${s.id}" style="${selected?`background:${s.color};border-color:${s.color};`:''}">
+            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-subject-select" data-id="${s.id}" style="--pc:${s.color};${selected?`background:${s.color};border-color:${s.color};`:''}">
               <span class="dot" style="background:${selected?'#fff':s.color}"></span>${escapeHtml(s.name)}
             </button>`;
           }).join('')}
@@ -1184,7 +1184,7 @@ function renderSettings(){
     <div class="section-label icon-row" style="justify-content:flex-start">${icon('target',13)} 学習バランス</div>
     <div class="card">${renderBalanceSettings()}</div>
 
-    <div class="section-label">💾 データのバックアップ</div>
+    <div class="section-label icon-row" style="justify-content:flex-start">${icon('archive',13)} データのバックアップ</div>
     <div class="card">
       <div class="backup-warning">
         ${icon('warning',14)}
