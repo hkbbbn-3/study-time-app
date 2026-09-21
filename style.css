@@ -1211,3 +1211,58 @@ html[data-design="neon"] .ring-fill{ filter:drop-shadow(0 0 5px var(--hero-ring)
 html[data-design="neon"].dark .hero-display .num{ text-shadow:0 0 10px rgba(255,255,255,.65), 0 0 24px rgba(255,120,210,.85), 0 0 40px rgba(39,216,255,.6); }
 html[data-design="neon"].dark .nav-active, html[data-design="neon"].dark .tabbar button.active{ text-shadow:0 0 10px rgba(255,90,190,.9); }
 html[data-design="neon"] .brand-mark{ box-shadow:0 0 14px rgba(255,62,165,.7), 0 0 22px rgba(39,216,255,.5); }
+
+/* =====================================================================
+   STUDY BALANCE (home card + settings). Group colours follow each design's primary pair.
+   ===================================================================== */
+:root{ --bal-1:var(--color-primary); --bal-2:var(--color-primary-2); --bal-3:var(--color-ok); --bal-4:var(--color-warn); }
+.balance-tabs{ display:inline-flex; gap:var(--sp-1); padding:var(--sp-1); border-radius:var(--radius-pill); background:var(--color-surface-soft); margin:var(--sp-1) 0 var(--sp-4); }
+.balance-tabs button{
+  min-height:36px; padding:0 var(--sp-4); border:0; border-radius:var(--radius-pill); background:transparent;
+  color:var(--color-muted); font:inherit; font-size:var(--fs-body); font-weight:700; cursor:pointer;
+}
+.balance-tabs button.active{ background:var(--color-primary-soft); color:var(--color-text); box-shadow:var(--shadow-sm); }
+.balance-bar{ position:relative; height:16px; margin:var(--sp-2) 0 var(--sp-4); }
+.balance-track{ display:flex; height:100%; border-radius:var(--radius-pill); background:var(--color-line); overflow:hidden; }
+.balance-seg{ height:100%; transition:width .6s var(--ease); }
+.balance-seg.g0, .balance-dot.g0{ background:var(--bal-1); }
+.balance-seg.g1, .balance-dot.g1{ background:var(--bal-2); }
+.balance-seg.g2, .balance-dot.g2{ background:var(--bal-3); }
+.balance-seg.g3, .balance-dot.g3{ background:var(--bal-4); }
+.balance-target{ position:absolute; top:-5px; bottom:-5px; width:3px; margin-left:-1.5px; border-radius:2px; background:var(--color-text); box-shadow:0 0 0 2px var(--color-surface); }
+.balance-legend-row{ display:flex; align-items:baseline; gap:var(--sp-2); padding:var(--sp-1) 0; font-size:var(--fs-body); }
+.balance-dot{ width:12px; height:12px; border-radius:50%; flex-shrink:0; align-self:center; }
+.balance-name{ flex:1; min-width:0; font-weight:700; color:var(--color-text); overflow-wrap:anywhere; }
+.balance-val{ font-weight:900; color:var(--color-text); font-size:var(--fs-body-lg); white-space:nowrap; }
+.balance-val small{ font-size:var(--fs-caption); font-weight:500; color:var(--color-muted); }
+.balance-goal{ font-size:var(--fs-caption); color:var(--color-faint); white-space:nowrap; min-width:4.5em; text-align:right; }
+.balance-advice{ margin-top:var(--sp-3); padding:var(--sp-3) var(--sp-4); border-radius:var(--radius-sm); background:var(--color-primary-soft); color:var(--color-text); font-size:var(--fs-body); font-weight:700; line-height:1.6; }
+.balance-note{ margin-top:var(--sp-3); font-size:var(--fs-caption); color:var(--color-muted); line-height:1.6; }
+.balance-invite .ghost-btn{ margin-top:var(--sp-3); }
+.balance-pill{
+  display:inline-flex; align-items:center; gap:var(--sp-2); min-height:var(--tap); padding:0 var(--sp-4);
+  border-radius:var(--radius-pill); border:2px solid var(--color-line); background:var(--color-surface);
+  color:var(--color-text); font:inherit; font-size:var(--fs-body); font-weight:700; cursor:pointer;
+}
+.balance-pill .dot{ width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.balance-pill.g0.on{ border-color:var(--bal-1); background:var(--color-primary-soft); }
+.balance-pill.g2.on{ border-color:var(--bal-3); background:var(--color-primary-soft); }
+.balance-pill.g1.on{ border-color:var(--bal-2); background:var(--color-primary-soft); }
+.balance-pill.g3.on{ border-color:var(--bal-4); background:var(--color-primary-soft); }
+.balance-pill::after{ content:"✓"; font-size:var(--fs-caption); visibility:hidden; } /* always reserves the check mark space so pills keep the same width and wrap identically in every group */
+.balance-pill.on::after{ visibility:visible; }
+.balance-target-label{ font-size:var(--fs-body-lg); font-weight:900; color:var(--color-text); margin-bottom:var(--sp-2); overflow-wrap:anywhere; }
+.balance-range{ width:100%; min-height:var(--tap); accent-color:var(--color-primary); }
+/* Designs whose two accent colours are too similar get their own contrasting pair for the balance groups */
+html[data-design="calm"]{ --bal-1:#5E7857; --bal-2:#B08D57; }
+html[data-design="calm"].dark{ --bal-1:#9DB897; --bal-2:#D4B47A; }
+html[data-design="cute"]{ --bal-1:#B85673; --bal-2:#6BA6D6; }
+html[data-design="cute"].dark{ --bal-1:#F0A0B6; --bal-2:#8FC0E8; }
+.balance-group-head{ display:flex; align-items:center; gap:var(--sp-2); margin-bottom:var(--sp-2); }
+.balance-group-head .field-label{ flex:1; }
+.balance-remove{ width:var(--tap); height:36px; border:0; border-radius:var(--radius-pill); background:transparent; color:var(--color-muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+.balance-target-select{ flex:0 0 42%; }
+.balance-sum{ font-size:var(--fs-caption); font-weight:700; line-height:1.6; margin-bottom:var(--sp-3); }
+.balance-sum.ok{ color:var(--color-ok); } .balance-sum.warn{ color:var(--color-warn); }
+.balance-actions{ display:flex; gap:var(--sp-2); flex-wrap:wrap; }
+.balance-actions .ghost-btn{ flex:1 1 40%; margin:0; }

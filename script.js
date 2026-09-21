@@ -56,6 +56,7 @@ let state = {
   theme: 'light',   // light / dark mode
   design: 'calm',   // visual design: 'calm' | 'cute' | 'neon' | 'violet' | 'sea' (independent of light/dark)
   lastMemo: '', // pre-fills the memo field for the next new record
+  balance: null,    // study-balance groups: {groups:[{name,subjectIds,target}]} with 2-4 groups, or null when the feature is off
 };
 
 const DESIGNS = [
@@ -78,6 +79,7 @@ let ui = {
   rangeStart: (function(){ const d=new Date(); d.setDate(d.getDate()-6); return dateToISO(d); })(), // for the home screen's date-range total
   rangeEnd: isoToday(),
   rangeSubjectIds: null, // null means "all subjects"; becomes an explicit array once the user filters
+  balancePeriod: 'week', // 'week' | 'month' for the home balance card
   confirm: null, // { title, desc, actionType, actionId }
   datePicker: null, // { year, month, target } when open — target is 'record', 'rangeStart', or 'rangeEnd'
   subjectEditor: null, // { id, name, color } when editing a subject
@@ -124,7 +126,7 @@ function persist(){
   saveTimer=setTimeout(()=>{
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, design: state.design, lastMemo: state.lastMemo
+        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, design: state.design, balance: state.balance, lastMemo: state.lastMemo
       }));
     }catch(e){ console.error('save failed', e); showToast('保存に失敗しました'); }
   }, 150);
@@ -140,6 +142,11 @@ async function loadData(){
       if(parsed.goals) state.goals = parsed.goals;
       if(parsed.theme) state.theme = parsed.theme;
       if(DESIGN_IDS.includes(parsed.design)) state.design = parsed.design; // older saves have no "design": keep the default
+      if(parsed.balance && parsed.balance.a && parsed.balance.b && typeof parsed.balance.targetA==='number'){ // early 2-group shape -> groups
+        const o = parsed.balance;
+        parsed.balance = { groups:[ {name:o.a.name, subjectIds:o.a.subjectIds||[], target:o.targetA}, {name:o.b.name, subjectIds:o.b.subjectIds||[], target:100-o.targetA} ] };
+      }
+      if(isValidBalance(parsed.balance)) state.balance = parsed.balance; // older saves have no balance: feature stays off
       if(parsed.lastMemo) state.lastMemo = parsed.lastMemo;
     }
   }catch(e){
@@ -394,6 +401,115 @@ function renderPage(){
 }
 
 // ---------- HOME ----------
+// ---------- study balance (2-4 groups of subjects vs. a target split) ----------
+const BALANCE_MIN_GROUPS = 2, BALANCE_MAX_GROUPS = 4;
+
+function isValidBalance(b){
+  return !!b && typeof b==='object' && Array.isArray(b.groups) &&
+    b.groups.length>=BALANCE_MIN_GROUPS && b.groups.length<=BALANCE_MAX_GROUPS &&
+    b.groups.every(g=>g && typeof g.name==='string' && Array.isArray(g.subjectIds) && typeof g.target==='number' && g.target>=0 && g.target<=100);
+}
+
+// Splits 100% evenly across n groups (any remainder goes to the first ones, in 1% steps).
+function evenTargets(n){
+  const base = Math.floor(100/n), extra = 100 - base*n;
+  return Array.from({length:n}, (_,i)=> base + (i<extra ? 1 : 0));
+}
+
+// Each group's target as a share of the targets' total, so a total that isn't exactly 100 still works.
+function normalizedTargets(groups){
+  const sum = groups.reduce((a,g)=>a+g.target, 0);
+  return groups.map(g=> sum>0 ? g.target/sum : 1/groups.length);
+}
+
+// Minutes per group between the start of the period (this Monday / the 1st) and today.
+function computeBalance(period){
+  const b = state.balance;
+  if(!b) return null;
+  const now = new Date();
+  const end = dateToISO(now);
+  let start;
+  if(period==='month') start = dateToISO(new Date(now.getFullYear(), now.getMonth(), 1));
+  else { const d = new Date(now); d.setDate(now.getDate() - ((now.getDay()+6)%7)); start = dateToISO(d); }
+  const groupOf = {};
+  b.groups.forEach((g,i)=>g.subjectIds.forEach(id=>{ groupOf[id] = i; }));
+  const mins = b.groups.map(()=>0);
+  let other = 0;
+  state.records.forEach(r=>{
+    if(r.date<start || r.date>end) return;
+    if(r.subjectId in groupOf) mins[groupOf[r.subjectId]] += r.minutes;
+    else other += r.minutes;
+  });
+  return { mins, other };
+}
+
+// A plain-language next step. The group that is furthest ahead of its target sets the pace; every other
+// group is told how much more it needs to catch up to the target split (nobody is asked to do less).
+function balanceAdvice(mins, groups){
+  const total = mins.reduce((a,x)=>a+x, 0);
+  if(total===0) return 'この期間の記録はまだありません。記録するとバランスが見えてきます。';
+  const t = normalizedTargets(groups);
+  if(mins.every((m,i)=>Math.abs((m/total)*100 - t[i]*100) <= 5)) return '目標に近いバランスです。この調子！';
+  const pace = Math.max(...mins.map((m,i)=> t[i]>0 ? m/t[i] : 0));
+  const parts = [];
+  mins.forEach((m,i)=>{
+    const add = Math.ceil((t[i]*pace - m)/10)*10;
+    if(add>=10) parts.push({ name:groups[i].name, add });
+  });
+  if(parts.length===0) return '目標に近いバランスです。この調子！';
+  parts.sort((x,y)=>y.add-x.add);
+  return `目標のバランスに近づけるには、${parts.map(p=>`${escapeHtml(p.name)}にあと${fmtMin(p.add)}`).join('、')}あてるのがおすすめです。`;
+}
+
+function renderBalanceHome(){
+  if(!state.balance){
+    return `
+    <div class="card card--compact balance-invite">
+      <div class="card-title icon-row">${icon('target',15)} 学習バランス</div>
+      <div class="balance-note">複数の勉強の時間配分を、目標と比べて見られます。</div>
+      <button class="ghost-btn" data-action="go-tab" data-tab="settings">設定でバランスを決める</button>
+    </div>`;
+  }
+  const groups = state.balance.groups;
+  const res = computeBalance(ui.balancePeriod);
+  const total = res.mins.reduce((a,x)=>a+x, 0);
+  // percentages that always add up to 100 (largest-remainder rounding)
+  const raw = res.mins.map(m=> total>0 ? (m/total)*100 : 0);
+  const pcts = raw.map(Math.floor);
+  let left = total>0 ? 100 - pcts.reduce((a,x)=>a+x, 0) : 0;
+  raw.map((v,i)=>({i, frac:v-Math.floor(v)})).sort((x,y)=>y.frac-x.frac).forEach(o=>{ if(left>0){ pcts[o.i]++; left--; } });
+  // marks on the bar where the target split changes from one group to the next
+  // The targets actually used are the entered ones scaled to add up to 100%, so show those (rounded to add up to 100).
+  const tShare = normalizedTargets(groups).map(x=>x*100);
+  const tPcts = tShare.map(Math.floor);
+  let tLeft = 100 - tPcts.reduce((a,x)=>a+x, 0);
+  tShare.map((v,i)=>({i, frac:v-Math.floor(v)})).sort((x,y)=>y.frac-x.frac).forEach(o=>{ if(tLeft>0){ tPcts[o.i]++; tLeft--; } });
+  let acc = 0;
+  const marks = tShare.slice(0,-1).map(v=>{ acc += v; return acc; });
+  const ariaLabel = groups.map((g,i)=>`${escapeHtml(g.name)} ${pcts[i]}%（目標 ${tPcts[i]}%）`).join("、");
+  return `
+    <div class="card">
+      <div class="card-title icon-row">${icon('target',15)} 学習バランス</div>
+      <div class="balance-tabs" role="group" aria-label="集計する期間">
+        <button type="button" class="${ui.balancePeriod==='week'?'active':''}" data-action="balance-period" data-period="week" aria-pressed="${ui.balancePeriod==='week'}">今週</button>
+        <button type="button" class="${ui.balancePeriod==='month'?'active':''}" data-action="balance-period" data-period="month" aria-pressed="${ui.balancePeriod==='month'}">今月</button>
+      </div>
+      <div class="balance-bar" role="img" aria-label="${ariaLabel}">
+        <div class="balance-track">${groups.map((g,i)=>`<div class="balance-seg g${i}" style="width:${pcts[i]}%"></div>`).join("")}</div>
+        ${marks.map(p=>`<div class="balance-target" style="left:${p}%"></div>`).join('')}
+      </div>
+      ${groups.map((g,i)=>`
+        <div class="balance-legend-row">
+          <span class="balance-dot g${i}"></span>
+          <span class="balance-name">${escapeHtml(g.name)}</span>
+          <span class="balance-val">${total>0 ? `${pcts[i]}%` : '―'}<small>${total>0 ? `（${fmtMin(res.mins[i])}）` : ''}</small></span>
+          <span class="balance-goal">目標 ${tPcts[i]}%</span>
+        </div>`).join('')}
+      <div class="balance-advice">${balanceAdvice(res.mins, groups)}</div>
+      ${res.other>0 ? `<div class="balance-note">グループ未設定の科目：${fmtMin(res.other)}（この割合には含めていません）</div>` : ''}
+    </div>`;
+}
+
 function renderHome(){
   const today = isoToday();
   const goal = goalFor(today);
@@ -505,6 +621,9 @@ function renderHome(){
         <div><div class="val">${goal>0?fmtMin(goal):'未設定'}</div><div class="lab">今日の目標</div></div>
       </div>
     </div>
+
+    <div class="section-label">バランス</div>
+    ${renderBalanceHome()}
 
     <div class="section-label">今週</div>
     <div class="card">
@@ -868,6 +987,9 @@ function renderSettings(){
       </div>
     </div>
 
+    <div class="section-label icon-row" style="justify-content:flex-start">${icon('target',13)} 学習バランス</div>
+    <div class="card">${renderBalanceSettings()}</div>
+
     <div class="section-label">💾 データのバックアップ</div>
     <div class="card">
       <div class="backup-warning">
@@ -882,6 +1004,50 @@ function renderSettings(){
       <input type="file" id="import-csv-file" class="file-input" accept=".csv,text/csv">
     </div>
   `;
+}
+
+function renderBalanceSettings(){
+  const bal = state.balance;
+  if(!bal){
+    return `
+      <div class="balance-note" style="margin-top:0">科目をグループに分けて、時間の配分を目標と比べます（2〜${BALANCE_MAX_GROUPS}グループ）。日商簿記を含む科目は、自動で2つ目のグループに入ります（あとから変更できます）。</div>
+      <button class="submit-btn" style="margin-top:14px" data-action="balance-enable">バランスを見る設定を始める</button>`;
+  }
+  const groups = bal.groups;
+  const sum = groups.reduce((a,g)=>a+g.target, 0);
+  const pctOptions = Array.from({length:19}, (_,i)=>(i+1)*5);
+  return `
+    ${groups.map((g,i)=>`
+      <div class="balance-group">
+        <div class="balance-group-head">
+          <span class="balance-dot g${i}"></span>
+          <label class="field-label" for="balance-name-${i}" style="margin:0">グループ${i+1}の名前</label>
+          ${groups.length>BALANCE_MIN_GROUPS ? `<button type="button" class="balance-remove" data-action="balance-remove-group" data-index="${i}" aria-label="グループ${i+1}「${escapeHtml(g.name)}」を削除">${icon('x',13)}</button>` : ''}
+        </div>
+        <div class="field-row">
+          <input class="input" type="text" id="balance-name-${i}" maxlength="14" data-field="balance-name" data-index="${i}" value="${escapeHtml(g.name)}">
+          <div class="select-wrap balance-target-select"><select data-field="balance-target" data-index="${i}" aria-label="グループ${i+1}の目標の割合">
+            ${pctOptions.map(p=>`<option value="${p}" ${p===g.target?'selected':''}>目標 ${p}%</option>`).join('')}
+          </select></div>
+        </div>
+        <label class="field-label" style="margin-top:var(--sp-3)">入れる科目</label>
+        <div class="subject-pill-grid">
+          ${state.subjects.map(s=>{
+            const on = g.subjectIds.includes(s.id);
+            return `<button type="button" class="balance-pill g${i} ${on?'on':''}" aria-pressed="${on}" data-action="balance-toggle-subject" data-index="${i}" data-id="${s.id}">
+              <span class="dot" style="background:${s.color}"></span>${escapeHtml(s.name)}
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="divider"></div>
+    `).join('')}
+    <div class="balance-sum ${sum===100?'ok':'warn'}" role="status">目標の合計：${sum}%${sum===100 ? '' : '（100%にすると分かりやすくなります。このままでも、割合に直して計算します）'}</div>
+    <div class="balance-actions">
+      <button class="ghost-btn" data-action="balance-equalize">均等にする</button>
+      ${groups.length<BALANCE_MAX_GROUPS ? `<button class="ghost-btn" data-action="balance-add-group">グループを追加</button>` : ''}
+    </div>
+    <button class="ghost-btn" style="margin-top:var(--sp-2)" data-action="balance-disable">バランス機能をオフにする</button>`;
 }
 
 function escapeHtml(str){
@@ -1152,6 +1318,50 @@ function onClick(e){
     saveGoalsFromForm();
     return;
   }
+  if(action==='balance-period'){
+    ui.balancePeriod = btn.dataset.period==='month' ? 'month' : 'week';
+    render(); return;
+  }
+  if(action==='balance-enable'){
+    // Subjects mentioning 簿記 start in group 2, everything else in group 1; both can be changed afterwards.
+    const isBookkeeping = s=>/簿記/.test(s.name);
+    state.balance = { groups: [
+      { name:'デジハリ', subjectIds: state.subjects.filter(s=>!isBookkeeping(s)).map(s=>s.id), target:50 },
+      { name:'T&L・簿記', subjectIds: state.subjects.filter(isBookkeeping).map(s=>s.id), target:50 },
+    ] };
+    persist(); render(); return;
+  }
+  if(action==='balance-disable'){
+    state.balance = null;
+    persist(); render(); return;
+  }
+  if(action==='balance-add-group' && state.balance && state.balance.groups.length<BALANCE_MAX_GROUPS){
+    const groups = state.balance.groups;
+    groups.push({ name:`グループ${groups.length+1}`, subjectIds:[], target:0 });
+    evenTargets(groups.length).forEach((t,i)=>{ groups[i].target = t; });
+    persist(); render(); return;
+  }
+  if(action==='balance-remove-group' && state.balance && state.balance.groups.length>BALANCE_MIN_GROUPS){
+    const groups = state.balance.groups;
+    groups.splice(Number(btn.dataset.index), 1);
+    evenTargets(groups.length).forEach((t,i)=>{ groups[i].target = t; });
+    persist(); render(); return;
+  }
+  if(action==='balance-equalize' && state.balance){
+    const groups = state.balance.groups;
+    evenTargets(groups.length).forEach((t,i)=>{ groups[i].target = t; });
+    persist(); render(); return;
+  }
+  if(action==='balance-toggle-subject' && state.balance){
+    const groups = state.balance.groups, idx = Number(btn.dataset.index), id = btn.dataset.id;
+    if(!groups[idx]) return;
+    if(groups[idx].subjectIds.includes(id)) groups[idx].subjectIds = groups[idx].subjectIds.filter(x=>x!==id);
+    else {
+      groups.forEach(g=>{ g.subjectIds = g.subjectIds.filter(x=>x!==id); }); // a subject belongs to one group only
+      groups[idx].subjectIds = [...groups[idx].subjectIds, id];
+    }
+    persist(); render(); return;
+  }
   if(action==='export-json'){ exportJson(); return; }
   if(action==='export-csv'){ exportCsv(); return; }
   if(action==='trigger-import'){ document.getElementById('import-file').click(); return; }
@@ -1169,6 +1379,16 @@ function onChange(e){
   if(field==='minutes'){ ui.form.minutes = Number(e.target.value); syncSubmitState(); return; }
   if(field==='memo'){ ui.form.memo = e.target.value; return; }
   if(field==='subject-edit-name'){ ui.subjectEditor.name = e.target.value; return; }
+  if(state.balance && field==='balance-name'){
+    const g = state.balance.groups[Number(e.target.dataset.index)];
+    if(g){ g.name = e.target.value.trim() || `グループ${Number(e.target.dataset.index)+1}`; persist(); }
+    return; // no re-render, so a click on a subject button right after typing still lands
+  }
+  if(state.balance && field==='balance-target'){
+    const g = state.balance.groups[Number(e.target.dataset.index)];
+    if(g){ g.target = Number(e.target.value); persist(); render(); }
+    return;
+  }
 }
 
 function syncSubmitState(){
