@@ -2033,15 +2033,15 @@ function launchConfetti(){
 }
 
 // ---------- diver: a standalone element appended once to <body>, independent of render() ----------
-// It used to be part of render()'s template inside #canvas, alongside .mesh/.sea-layers/.phone —
-// on one real device that made the WHOLE page render blank (only the diver visible) even though
-// every element's computed position/size/color checked out fine, so something about having this
-// element as a sibling inside that stacking context broke painting there. Living on <body> directly,
-// outside #canvas entirely, avoids that.
-// It also does NOT use position:fixed: on that same device (hardware acceleration off, so Chrome
-// falls back to software rendering), position:fixed alone reproduced the same whole-page-blank bug —
-// confirmed by disabling just that one property in devtools. It uses position:absolute instead, with
-// `top` kept in sync with scroll in JS (positionDiver, below) as a fixed-position substitute.
+// On one real laptop (hardware acceleration off, so Chrome falls back to software rendering), this
+// element made the WHOLE page flicker blank at random — even sitting still, nothing being toggled.
+// Two things were narrowed down and fixed:
+//  - It used to be part of render()'s template inside #canvas, alongside .mesh/.sea-layers/.phone.
+//    Living on <body> directly, outside #canvas entirely, made it noticeably less frequent.
+//  - What was actually driving it: continuous repaint, running forever regardless of user action —
+//    the frame-flip interval below, plus what used to be an infinite CSS animation on this element
+//    (see the .diver-companion comment in style.css). The animation is gone; the frame flip stays,
+//    but only runs while the Deep Sea design is actually showing.
 const DIVER_FRAME_COUNT = 30;
 function initDiver(){
   const el = document.createElement('div');
@@ -2051,9 +2051,11 @@ function initDiver(){
 
   // Frame flip: a plain interval sets background-image directly. (Animating background-image via
   // CSS keyframes rendered blank mid-flip in earlier testing — background-image isn't reliably
-  // animatable — so this avoids that instead of fighting it.)
+  // animatable — so this avoids that instead of fighting it.) Skipped outside Deep Sea, where the
+  // element is hidden anyway — no point repainting it in the background.
   let frame = 0;
   setInterval(() => {
+    if(document.documentElement.dataset.design !== 'sea') return;
     frame = (frame + 1) % DIVER_FRAME_COUNT;
     el.style.backgroundImage = `url('assets/diver/diver_${String(frame).padStart(2,'0')}.png')`;
   }, 1000/5);
