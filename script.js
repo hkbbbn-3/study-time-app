@@ -2060,6 +2060,11 @@ function initDiver(){
     el.style.backgroundImage = `url('assets/diver/diver_${String(frame).padStart(2,'0')}.png')`;
   }, 1000/5);
 
+  // DIAGNOSTIC BUILD: no scroll listeners at all right now (see the big comment above). The diver
+  // just sits at a fixed spot and drifts out of view as you scroll — that's expected and fine for
+  // this test. If the flicker nastuki sees is STILL there while scrolling with this in place, it
+  // isn't caused by anything this file does in response to scroll.
+  /*
   // Keep the diver roughly in view without position:fixed: `top` in style.css is a fixed
   // document-relative position (58vh, never touched again after this point — changing `top` on
   // every scroll event forces a layout recalculation each time, which turned out to be part of what
@@ -2100,6 +2105,7 @@ function initDiver(){
     clearTimeout(stopTimer);
     stopTimer = setTimeout(() => { target = 0; kick(); }, 400);
   }, { passive:true });
+  */
 }
 
 // ---------- PWA: service worker registration ----------
