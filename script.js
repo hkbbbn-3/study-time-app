@@ -2056,8 +2056,9 @@ function initDiver(){
   // CSS vars the diver-drift keyframes in style.css read:
   //  --diver-lift (px): moves the diver up the screen while current>0, down while current<0.
   //  --diver-tilt (deg): the diver's artwork already leans "up" at rest (head trailing up-left,
-  //    fins down-right), so rotating it further that way reads clearly as swimming up — rotating it
-  //    the other way just looks sideways rather than "down" — hence the asymmetric range below.
+  //    fins down-right): a small rotation the other way just looks sideways, but rotating it much
+  //    further (past horizontal, toward nose-first) reads clearly as diving down — hence the
+  //    asymmetric range below (a wide swing down, a smaller one up).
   // The window (not an inner div) is what scrolls.
   if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   let lastY = window.scrollY, current = 0, target = 0, raf = null, stopTimer = null;
@@ -2065,7 +2066,7 @@ function initDiver(){
     current += (target - current) * 0.12;
     if(Math.abs(target - current) < 0.01) current = target;
     document.documentElement.style.setProperty('--diver-lift', (-current * 34).toFixed(1) + 'px');
-    document.documentElement.style.setProperty('--diver-tilt', ((current >= 0 ? current * 30 : current * 12)).toFixed(1) + 'deg');
+    document.documentElement.style.setProperty('--diver-tilt', ((current >= 0 ? current * 30 : current * 72)).toFixed(1) + 'deg');
     raf = (current === target) ? null : requestAnimationFrame(tick);
   }
   function kick(){ if(raf === null) raf = requestAnimationFrame(tick); }
