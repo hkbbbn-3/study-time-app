@@ -2036,6 +2036,44 @@ function launchConfetti(){
   }, 50);
 }
 
+// ---------- diver: swims via .diver-companion, always re-queried since render() replaces it ----------
+const DIVER_FRAME_COUNT = 30;
+function initDiver(){
+  // Frame flip: a plain interval sets background-image directly. (Animating background-image via
+  // CSS keyframes rendered blank mid-flip in testing — background-image isn't reliably animatable —
+  // so this avoids that instead of fighting it. Re-querying the element each tick means it keeps
+  // working across the app's full re-renders without needing to re-attach anything.)
+  let frame = 0;
+  setInterval(() => {
+    const el = document.querySelector('.diver-companion');
+    if(!el) return;
+    frame = (frame + 1) % DIVER_FRAME_COUNT;
+    el.style.backgroundImage = `url('assets/diver/diver_${String(frame).padStart(2,'0')}.png')`;
+  }, 1000/5);
+
+  // Scroll tilt: --diver-scroll is a plain number from -1 (swimming up) to 1 (swimming down), read
+  // by the diver-drift keyframes in style.css. Eased with a tiny rAF loop so it doesn't jump, and
+  // settles back to 0 shortly after scrolling stops. The window (not an inner div) is what scrolls.
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let lastY = window.scrollY, current = 0, target = 0, raf = null, stopTimer = null;
+  function tick(){
+    current += (target - current) * 0.12;
+    if(Math.abs(target - current) < 0.01) current = target;
+    document.documentElement.style.setProperty('--diver-scroll', current.toFixed(3));
+    raf = (current === target) ? null : requestAnimationFrame(tick);
+  }
+  function kick(){ if(raf === null) raf = requestAnimationFrame(tick); }
+  window.addEventListener('scroll', () => {
+    if(document.documentElement.dataset.design !== 'sea') return;
+    const y = window.scrollY;
+    if(y !== lastY) target = y > lastY ? 1 : -1;
+    lastY = y;
+    kick();
+    clearTimeout(stopTimer);
+    stopTimer = setTimeout(() => { target = 0; kick(); }, 400);
+  }, { passive:true });
+}
+
 // ---------- PWA: service worker registration ----------
 // Only works when served over http(s) (e.g. VSCode Live Server, GitHub Pages, etc.) —
 // browsers block service workers on file:// URLs, so this silently no-ops there.
@@ -2049,6 +2087,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
 (async function init(){
   await loadData();
   render();
+  initDiver();
 })();
 
 })();

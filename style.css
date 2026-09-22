@@ -671,55 +671,25 @@ html[data-design="sea"] .sea-layers{ display:block; }
 /* Diver: a 30-frame flipbook (assets/diver/diver_00..29.png), always visible somewhere on screen.
    It floats above the cards (fixed to the viewport, not the page), on its own layer above .phone so
    the edge-to-edge cards on a phone don't hide it, but below the tab bar and modals so it never sits
-   on top of a button or a dialog. Frame switching uses plain CSS keyframes: background-image isn't
-   interpolable, so the browser just flips to each listed frame in turn — no JS/timer needed, so it
-   survives the app's full re-renders. */
+   on top of a button or a dialog. Frame switching is done in script.js (initDiver): swapping
+   background-image via CSS keyframes turned out to render blank mid-flip in testing (background-image
+   isn't a property browsers reliably animate), so a small interval sets it directly instead. */
 .diver-companion{
   display:none; position:fixed; z-index:15; pointer-events:none;
   top:58%; right:2%; width:88px; aspect-ratio:392/282;
   background-repeat:no-repeat; background-size:contain; background-position:center;
   opacity:.9;
   filter:drop-shadow(0 8px 16px rgba(0,10,20,.4));
-  animation: diver-frames 6s linear infinite, diver-drift 26s ease-in-out infinite alternate;
+  animation: diver-drift 26s ease-in-out infinite alternate;
 }
 html[data-design="sea"] .diver-companion{ display:block; }
-@keyframes diver-frames{
-  0%{background-image:url('assets/diver/diver_00.png');}
-  3.33%{background-image:url('assets/diver/diver_01.png');}
-  6.67%{background-image:url('assets/diver/diver_02.png');}
-  10%{background-image:url('assets/diver/diver_03.png');}
-  13.33%{background-image:url('assets/diver/diver_04.png');}
-  16.67%{background-image:url('assets/diver/diver_05.png');}
-  20%{background-image:url('assets/diver/diver_06.png');}
-  23.33%{background-image:url('assets/diver/diver_07.png');}
-  26.67%{background-image:url('assets/diver/diver_08.png');}
-  30%{background-image:url('assets/diver/diver_09.png');}
-  33.33%{background-image:url('assets/diver/diver_10.png');}
-  36.67%{background-image:url('assets/diver/diver_11.png');}
-  40%{background-image:url('assets/diver/diver_12.png');}
-  43.33%{background-image:url('assets/diver/diver_13.png');}
-  46.67%{background-image:url('assets/diver/diver_14.png');}
-  50%{background-image:url('assets/diver/diver_15.png');}
-  53.33%{background-image:url('assets/diver/diver_16.png');}
-  56.67%{background-image:url('assets/diver/diver_17.png');}
-  60%{background-image:url('assets/diver/diver_18.png');}
-  63.33%{background-image:url('assets/diver/diver_19.png');}
-  66.67%{background-image:url('assets/diver/diver_20.png');}
-  70%{background-image:url('assets/diver/diver_21.png');}
-  73.33%{background-image:url('assets/diver/diver_22.png');}
-  76.67%{background-image:url('assets/diver/diver_23.png');}
-  80%{background-image:url('assets/diver/diver_24.png');}
-  83.33%{background-image:url('assets/diver/diver_25.png');}
-  86.67%{background-image:url('assets/diver/diver_26.png');}
-  90%{background-image:url('assets/diver/diver_27.png');}
-  93.33%{background-image:url('assets/diver/diver_28.png');}
-  96.67%{background-image:url('assets/diver/diver_29.png');}
-  100%{background-image:url('assets/diver/diver_00.png');}
-}
+/* --diver-scroll is a plain number from -1 (scrolling up) to 1 (scrolling down), eased by JS in
+   script.js. It tilts the diver to face the direction it's swimming and nudges it along that way;
+   it settles back to 0 when scrolling stops. */
 @keyframes diver-drift{
-  0%{ transform:translate(0,0) rotate(-2deg); }
-  50%{ transform:translate(-30px,36px) rotate(3deg); }
-  100%{ transform:translate(-10px,-30px) rotate(-1deg); }
+  0%{ transform:translate(0, calc(var(--diver-scroll,0) * 30px)) rotate(calc(-2deg + var(--diver-scroll,0) * 26deg)); }
+  50%{ transform:translate(-30px, calc(36px + var(--diver-scroll,0) * 30px)) rotate(calc(3deg + var(--diver-scroll,0) * 26deg)); }
+  100%{ transform:translate(-10px, calc(-30px + var(--diver-scroll,0) * 30px)) rotate(calc(-1deg + var(--diver-scroll,0) * 26deg)); }
 }
 
 .phone{
