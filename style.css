@@ -669,14 +669,18 @@ html[data-design="sea"] .sea-layers{ display:block; }
 .sea-slot{ position:absolute; }
 
 /* Diver: a 30-frame flipbook (assets/diver/diver_00..29.png), always visible somewhere on screen.
-   It floats above the cards (fixed to the viewport, not the page), on its own layer above .phone so
-   the edge-to-edge cards on a phone don't hide it, but below the tab bar and modals so it never sits
-   on top of a button or a dialog. Frame switching is done in script.js (initDiver): swapping
-   background-image via CSS keyframes turned out to render blank mid-flip in testing (background-image
-   isn't a property browsers reliably animate), so a small interval sets it directly instead. */
+   It floats above the cards, on its own layer above .phone so the edge-to-edge cards on a phone
+   don't hide it, but below the tab bar and modals so it never sits on top of a button or a dialog.
+   Frame switching is done in script.js (initDiver): swapping background-image via CSS keyframes
+   turned out to render blank mid-flip in testing (background-image isn't a property browsers
+   reliably animate), so a small interval sets it directly instead.
+   position:absolute + a JS-tracked `top` (not position:fixed) — on one real laptop with hardware
+   acceleration off, a position:fixed element here made the WHOLE page render blank while every
+   element's computed position/size/color still checked out fine in devtools; removing position:fixed
+   alone fixed it. script.js keeps `top` in sync with scroll so it still stays roughly in view. */
 .diver-companion{
-  display:none; position:fixed; z-index:15; pointer-events:none;
-  top:58%; right:2%; width:88px; aspect-ratio:392/282;
+  display:none; position:absolute; z-index:15; pointer-events:none;
+  top:58vh; right:2%; width:88px; aspect-ratio:392/282;
   background-repeat:no-repeat; background-size:contain; background-position:center;
   opacity:.9;
   filter:drop-shadow(0 8px 16px rgba(0,10,20,.4));

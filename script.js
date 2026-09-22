@@ -2036,8 +2036,12 @@ function launchConfetti(){
 // It used to be part of render()'s template inside #canvas, alongside .mesh/.sea-layers/.phone —
 // on one real device that made the WHOLE page render blank (only the diver visible) even though
 // every element's computed position/size/color checked out fine, so something about having this
-// fixed, animated, frequently-repainted layer as a sibling inside that stacking context broke
-// painting there. Living on <body> directly, outside #canvas entirely, avoids that.
+// element as a sibling inside that stacking context broke painting there. Living on <body> directly,
+// outside #canvas entirely, avoids that.
+// It also does NOT use position:fixed: on that same device (hardware acceleration off, so Chrome
+// falls back to software rendering), position:fixed alone reproduced the same whole-page-blank bug —
+// confirmed by disabling just that one property in devtools. It uses position:absolute instead, with
+// `top` kept in sync with scroll in JS (positionDiver, below) as a fixed-position substitute.
 const DIVER_FRAME_COUNT = 30;
 function initDiver(){
   const el = document.createElement('div');
@@ -2053,6 +2057,13 @@ function initDiver(){
     frame = (frame + 1) % DIVER_FRAME_COUNT;
     el.style.backgroundImage = `url('assets/diver/diver_${String(frame).padStart(2,'0')}.png')`;
   }, 1000/5);
+
+  // Keep the diver roughly in view without position:fixed: track scroll position ourselves and
+  // write it as an absolute `top` (document-relative, since the element is a direct child of body).
+  function positionDiver(){ el.style.top = (window.scrollY + window.innerHeight * 0.58) + 'px'; }
+  positionDiver();
+  window.addEventListener('scroll', positionDiver, { passive:true });
+  window.addEventListener('resize', positionDiver);
 
   // Scroll direction: `current` eases toward +1 while scrolling up, -1 while scrolling down, and
   // back to 0 shortly after scrolling stops (a tiny rAF loop, so it doesn't jump). It drives two
