@@ -2060,16 +2060,21 @@ function initDiver(){
     el.style.backgroundImage = `url('assets/diver/diver_${String(frame).padStart(2,'0')}.png')`;
   }, 1000/5);
 
-  // Keep the diver roughly in view without position:fixed: track scroll position ourselves and
-  // write it as an absolute `top` (document-relative, since the element is a direct child of body).
-  function positionDiver(){ el.style.top = (window.scrollY + window.innerHeight * 0.58) + 'px'; }
+  // Keep the diver roughly in view without position:fixed: `top` in style.css is a fixed
+  // document-relative position (58vh, never touched again after this point — changing `top` on
+  // every scroll event forces a layout recalculation each time, which turned out to be part of what
+  // made the whole page flicker while scrolling on nastuki's laptop). Instead, shift it back down by
+  // exactly however far the page has scrolled, via a transform (composite-only, no layout), so it
+  // still lands at the same spot in the viewport regardless of scroll position.
+  function positionDiver(){ el.style.setProperty('--diver-scroll-y', window.scrollY + 'px'); }
   positionDiver();
   window.addEventListener('scroll', positionDiver, { passive:true });
-  window.addEventListener('resize', positionDiver);
 
   // Scroll direction: `current` eases toward +1 while scrolling up, -1 while scrolling down, and
   // back to 0 shortly after scrolling stops (a tiny rAF loop, so it doesn't jump). It drives two
-  // CSS vars the diver-drift keyframes in style.css read:
+  // CSS vars, written onto the diver element ITSELF (not document.documentElement — confirmed on
+  // nastuki's laptop that writing a custom property on <html> during scroll, up to 60x/sec, was what
+  // made the whole page flicker while scrolling; scoping it to this one element fixed it):
   //  --diver-lift (px): moves the diver up the screen while current>0, down while current<0.
   //  --diver-tilt (deg): the diver's artwork already leans "up" at rest (head trailing up-left,
   //    fins down-right): a small rotation the other way just looks sideways, but rotating it much
@@ -2081,8 +2086,8 @@ function initDiver(){
   function tick(){
     current += (target - current) * 0.12;
     if(Math.abs(target - current) < 0.01) current = target;
-    document.documentElement.style.setProperty('--diver-lift', (-current * 34).toFixed(1) + 'px');
-    document.documentElement.style.setProperty('--diver-tilt', ((current >= 0 ? current * 30 : current * 72)).toFixed(1) + 'deg');
+    el.style.setProperty('--diver-lift', (-current * 34).toFixed(1) + 'px');
+    el.style.setProperty('--diver-tilt', ((current >= 0 ? current * 30 : current * 72)).toFixed(1) + 'deg');
     raf = (current === target) ? null : requestAnimationFrame(tick);
   }
   function kick(){ if(raf === null) raf = requestAnimationFrame(tick); }

@@ -691,7 +691,7 @@ html[data-design="sea"] .sea-layers{ display:block; }
   background-repeat:no-repeat; background-size:contain; background-position:center;
   opacity:.9;
   filter:drop-shadow(0 8px 16px rgba(0,10,20,.4));
-  transform:translate(0, var(--diver-lift,0px)) rotate(calc(-1deg + var(--diver-tilt,0deg)));
+  transform:translate(0, calc(var(--diver-scroll-y,0px) + var(--diver-lift,0px))) rotate(calc(-1deg + var(--diver-tilt,0deg)));
 }
 html[data-design="sea"] .diver-companion{ display:block; }
 /* --diver-lift (px) and --diver-tilt (deg) are set by JS (script.js) from the scroll direction and
