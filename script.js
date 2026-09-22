@@ -219,14 +219,17 @@ function render(){
   root.innerHTML = `
     <div class="mesh"><span></span><span></span><span></span></div>
     <!-- Deep Sea backdrop (visible only when data-design="sea"). Mounting points for future
-         scroll-depth effects: drive --depth (0..1) on <html>, animate .sea-particles, and drop the
-         diver / fish / jellyfish into .sea-slot elements. -->
+         scroll-depth effects: drive --depth (0..1) on <html>, animate .sea-particles, and drop
+         fish / jellyfish into .sea-slot elements. -->
     <div class="sea-layers" aria-hidden="true">
       <div class="sea-gradient"></div>
       <div class="sea-light"></div>
       <div class="sea-particles"></div>
-      <div class="sea-slot sea-slot--diver" data-slot="diver"></div>
     </div>
+    <!-- The diver swims as a floating companion above the cards (not behind them, like the rest of
+         .sea-layers) — on a phone the cards fill the screen edge to edge, so anything mounted behind
+         them would almost never be visible. -->
+    <div class="diver-companion" aria-hidden="true"></div>
     <div class="phone">
       <div class="topbar">
         <div class="brand">
