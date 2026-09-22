@@ -668,61 +668,6 @@ html[data-design="sea"] .sea-layers{ display:block; }
 .sea-particles{ position:absolute; inset:0; }
 .sea-slot{ position:absolute; }
 
-/* Diver: a single static frame (assets/diver/diver_15.png), floating above the cards so it stays
-   visible regardless of scroll and tilts to dive deeper the further down the page you go.
-   On one real laptop (hardware acceleration off, so Chrome falls back to software rendering), every
-   JS-driven version of this — a 'scroll' event handler doing ANY per-scroll work, no matter how small
-   (an animated frame-flip interval, a position update, a custom property scoped to just this element)
-   — made the whole page flicker at random while actively scrolling. This version has NO JS scroll
-   involvement: `animation-timeline: scroll(root block)` ties the tilt directly to the page's own
-   scroll position, computed by the browser itself with no main-thread JS in the loop at all — a
-   genuinely different mechanism, not just a lighter version of the old one. position:fixed is safe to
-   use again here specifically because nothing is writing to this element on scroll anymore (fixed
-   alone was never the problem — only ever combined with something actively touching it every frame). */
-.diver-companion{
-  display:none; position:fixed; z-index:15; pointer-events:none;
-  top:55vh; right:2%; width:88px; aspect-ratio:392/282;
-  background-repeat:no-repeat; background-size:contain; background-position:center;
-  opacity:.9;
-  filter:drop-shadow(0 8px 16px rgba(0,10,20,.4));
-  animation: diver-dive linear both;
-  animation-timeline: scroll(root block);
-  animation-range: 0% 100%;
-}
-html[data-design="sea"] .diver-companion{ display:block; }
-@keyframes diver-dive{
-  0%{ transform:translate(0,0) rotate(18deg); }
-  50%{ transform:translate(-6px,10px) rotate(-2deg); }
-  100%{ transform:translate(-14px,20px) rotate(-65deg); }
-}
-/* Bubbles near the diver's head (diver_15.png's head sits toward the upper-left of the frame).
-   Same reasoning as the tilt above: scroll-driven, not a time-based loop, so they only ever animate
-   while the page is actually scrolling — never "running" in the background. Each one covers a
-   different slice of the page's scroll range (via animation-range) so they rise one after another
-   rather than all at once. They're children of .diver-companion so its own tilt/position carries them
-   along for free. */
-.diver-bubble{
-  position:absolute; width:5px; height:5px; border-radius:50%;
-  background:rgba(255,255,255,.85); left:16%; top:10%;
-  opacity:0;
-  animation: diver-bubble-rise linear both;
-  animation-timeline: scroll(root block);
-}
-.diver-bubble.b1{ animation-range: 0% 22%; }
-.diver-bubble.b2{ left:21%; top:5%; animation-range: 14% 38%; }
-.diver-bubble.b3{ left:26%; top:12%; animation-range: 30% 55%; }
-@keyframes diver-bubble-rise{
-  0%{ opacity:0; transform:translateY(0) scale(.6); }
-  45%{ opacity:.9; }
-  100%{ opacity:0; transform:translateY(-16px) scale(1.15); }
-}
-/* Browsers without scroll-driven animations (pre-2023-ish) just get a diver that holds its resting
-   tilt, no bubbles — still visible, still floating, just not reactive to scroll. */
-@supports not (animation-timeline: scroll()){
-  .diver-companion{ animation:none; }
-  .diver-bubble{ display:none; }
-}
-
 .phone{
   width:100%;
   max-width:var(--maxw);
@@ -1270,7 +1215,7 @@ html[data-design="violet"] .subject-pill.selected .dot{
   .phone{ min-height:calc(100vh - var(--sp-8) * 2); }
 }
 @media (prefers-reduced-motion: reduce){
-  .mesh span, .hero-achieved, .fade-in, .spinner, .sea-gradient, .diver-companion{ animation:none; transition:none; }
+  .mesh span, .hero-achieved, .fade-in, .spinner, .sea-gradient{ animation:none; transition:none; }
 }
 
 /* Neon Pop: extra glow on key numbers, the ring and chart bars (decorative only) */
