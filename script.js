@@ -2052,18 +2052,23 @@ function initDiver(){
   // Frame flip: a plain interval sets background-image directly. (Animating background-image via
   // CSS keyframes rendered blank mid-flip in earlier testing — background-image isn't reliably
   // animatable — so this avoids that instead of fighting it.) Skipped outside Deep Sea, where the
-  // element is hidden anyway — no point repainting it in the background.
-  let frame = 0;
+  // element is hidden anyway, and paused while actually scrolling: confirmed on nastuki's laptop
+  // that this interval landing during an active scroll was the last remaining source of the
+  // whole-page flicker there, even with position/tilt tracking removed entirely (see below).
+  let frame = 0, scrolling = false, scrollSettleTimer = null;
+  window.addEventListener('scroll', () => {
+    scrolling = true;
+    clearTimeout(scrollSettleTimer);
+    scrollSettleTimer = setTimeout(() => { scrolling = false; }, 300);
+  }, { passive:true });
   setInterval(() => {
-    if(document.documentElement.dataset.design !== 'sea') return;
+    if(document.documentElement.dataset.design !== 'sea' || scrolling) return;
     frame = (frame + 1) % DIVER_FRAME_COUNT;
     el.style.backgroundImage = `url('assets/diver/diver_${String(frame).padStart(2,'0')}.png')`;
   }, 1000/5);
 
-  // DIAGNOSTIC BUILD: no scroll listeners at all right now (see the big comment above). The diver
-  // just sits at a fixed spot and drifts out of view as you scroll — that's expected and fine for
-  // this test. If the flicker nastuki sees is STILL there while scrolling with this in place, it
-  // isn't caused by anything this file does in response to scroll.
+  // Position/scroll-direction tracking is still off for now (see the big comment above) — keeping
+  // it off while confirming the flicker is fully gone, rather than re-adding several things at once.
   /*
   // Keep the diver roughly in view without position:fixed: `top` in style.css is a fixed
   // document-relative position (58vh, never touched again after this point — changing `top` on
