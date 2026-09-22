@@ -695,13 +695,33 @@ html[data-design="sea"] .diver-companion{ display:block; }
   50%{ transform:translate(-6px,10px) rotate(-2deg); }
   100%{ transform:translate(-14px,20px) rotate(-65deg); }
 }
+/* Bubbles near the diver's head (diver_15.png's head sits toward the upper-left of the frame).
+   Same reasoning as the tilt above: scroll-driven, not a time-based loop, so they only ever animate
+   while the page is actually scrolling — never "running" in the background. Each one covers a
+   different slice of the page's scroll range (via animation-range) so they rise one after another
+   rather than all at once. They're children of .diver-companion so its own tilt/position carries them
+   along for free. */
+.diver-bubble{
+  position:absolute; width:5px; height:5px; border-radius:50%;
+  background:rgba(255,255,255,.85); left:16%; top:10%;
+  opacity:0;
+  animation: diver-bubble-rise linear both;
+  animation-timeline: scroll(root block);
+}
+.diver-bubble.b1{ animation-range: 0% 22%; }
+.diver-bubble.b2{ left:21%; top:5%; animation-range: 14% 38%; }
+.diver-bubble.b3{ left:26%; top:12%; animation-range: 30% 55%; }
+@keyframes diver-bubble-rise{
+  0%{ opacity:0; transform:translateY(0) scale(.6); }
+  45%{ opacity:.9; }
+  100%{ opacity:0; transform:translateY(-16px) scale(1.15); }
+}
 /* Browsers without scroll-driven animations (pre-2023-ish) just get a diver that holds its resting
-   tilt — still visible, still floating, just not reactive to scroll. */
+   tilt, no bubbles — still visible, still floating, just not reactive to scroll. */
 @supports not (animation-timeline: scroll()){
   .diver-companion{ animation:none; }
+  .diver-bubble{ display:none; }
 }
-/* --diver-lift (px) and --diver-tilt (deg): see script.js (initDiver) for how these are set and why
-   --diver-tilt's range is asymmetric (wide swing down, small swing up). */
 
 .phone{
   width:100%;

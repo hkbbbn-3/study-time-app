@@ -2034,19 +2034,20 @@ function launchConfetti(){
 
 // ---------- diver: a standalone element appended once to <body>, independent of render() ----------
 // Floats above the cards so it stays visible regardless of scroll, tilting to dive deeper the further
-// down the page you go. On one real laptop (hardware acceleration off, so Chrome falls back to
-// software rendering), every JS-driven version of this — a scroll event handler doing ANY work each
-// time, however small (an interval, a position update, even just a value scoped to the element) —
-// flickered the whole page at random while actively scrolling. This version has NO JS scroll
-// involvement at all: the tilt is a native CSS scroll-driven animation (animation-timeline:scroll(),
-// see .diver-companion in style.css), computed by the browser itself with no main-thread JS in the
-// loop. This is a genuinely different mechanism from everything tried before, not just a lighter
-// version of it — confirm on nastuki's laptop before assuming it holds.
+// down the page you go, with a few bubbles rising near its head. On one real laptop (hardware
+// acceleration off, so Chrome falls back to software rendering), every JS-driven version of this — a
+// scroll event handler doing ANY work each time, however small (an interval, a position update, even
+// just a value scoped to the element) — flickered the whole page at random while actively scrolling.
+// This version has NO JS scroll involvement at all: the tilt and the bubbles are native CSS
+// scroll-driven animations (animation-timeline:scroll(), see .diver-companion/.diver-bubble in
+// style.css), computed by the browser itself with no main-thread JS in the loop — a genuinely
+// different mechanism from everything tried before, not just a lighter version of it.
 function initDiver(){
   const el = document.createElement('div');
   el.className = 'diver-companion';
   el.setAttribute('aria-hidden', 'true');
   el.style.backgroundImage = `url('assets/diver/diver_15.png')`;
+  el.innerHTML = `<span class="diver-bubble b1"></span><span class="diver-bubble b2"></span><span class="diver-bubble b3"></span>`;
   document.body.appendChild(el);
 }
 
