@@ -804,6 +804,7 @@ function renderHome(){
         <div><div class="val">${fmtMin(heroWeekTotal)}</div><div class="lab">今週</div></div>
         <div><div class="val">${goal>0?fmtMin(goal):'未設定'}</div><div class="lab">今日の目標</div></div>
       </div>
+      <div class="hero-diver" aria-hidden="true"></div>
     </div>
 
     <div class="section-label">バランス</div>
@@ -2032,85 +2033,28 @@ function launchConfetti(){
   }, 50);
 }
 
-// ---------- diver: a standalone element appended once to <body>, independent of render() ----------
-// On one real laptop (hardware acceleration off, so Chrome falls back to software rendering), this
-// element made the WHOLE page flicker blank at random — even sitting still, nothing being toggled.
-// Two things were narrowed down and fixed:
-//  - It used to be part of render()'s template inside #canvas, alongside .mesh/.sea-layers/.phone.
-//    Living on <body> directly, outside #canvas entirely, made it noticeably less frequent.
-//  - What was actually driving it: continuous repaint, running forever regardless of user action —
-//    the frame-flip interval below, plus what used to be an infinite CSS animation on this element
-//    (see the .diver-companion comment in style.css). The animation is gone; the frame flip stays,
-//    but only runs while the Deep Sea design is actually showing.
+// ---------- diver: lives inside the hero card's own markup (.hero-diver in renderHome), not as an
+// independent overlay. It used to float above every card, positioned/fixed with its own elevated
+// z-index — on one real laptop (hardware acceleration off, so Chrome falls back to software
+// rendering), that made the WHOLE page flicker at random while scrolling, no matter how much its own
+// CSS/JS was pared back (no animation, no layout-touching properties, custom properties scoped to
+// itself, frame-flip paused during scroll — still flickered occasionally). What finally worked was
+// giving up on "always visible regardless of scroll" and just letting it be a normal, contained,
+// in-flow decoration — the same as any other decorative bit already inside a card, none of which
+// caused any trouble. It now scrolls away with the hero card like anything else in it.
 const DIVER_FRAME_COUNT = 30;
 function initDiver(){
-  const el = document.createElement('div');
-  el.className = 'diver-companion';
-  el.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(el);
-
-  // Frame flip: a plain interval sets background-image directly. (Animating background-image via
-  // CSS keyframes rendered blank mid-flip in earlier testing — background-image isn't reliably
-  // animatable — so this avoids that instead of fighting it.) Skipped outside Deep Sea, where the
-  // element is hidden anyway, and paused while actually scrolling: confirmed on nastuki's laptop
-  // that this interval landing during an active scroll was the last remaining source of the
-  // whole-page flicker there, even with position/tilt tracking removed entirely (see below).
-  let frame = 0, scrolling = false, scrollSettleTimer = null;
-  window.addEventListener('scroll', () => {
-    scrolling = true;
-    clearTimeout(scrollSettleTimer);
-    scrollSettleTimer = setTimeout(() => { scrolling = false; }, 300);
-  }, { passive:true });
+  // Frame flip: a plain interval sets background-image directly (animating background-image via CSS
+  // keyframes rendered blank mid-flip in earlier testing). Re-queries .hero-diver every tick since
+  // render() recreates the hero card (and everything in it) on every state change.
+  let frame = 0;
   setInterval(() => {
-    if(document.documentElement.dataset.design !== 'sea' || scrolling) return;
+    if(document.documentElement.dataset.design !== 'sea') return;
+    const el = document.querySelector('.hero-diver');
+    if(!el) return;
     frame = (frame + 1) % DIVER_FRAME_COUNT;
     el.style.backgroundImage = `url('assets/diver/diver_${String(frame).padStart(2,'0')}.png')`;
   }, 1000/5);
-
-  // Position/scroll-direction tracking is still off for now (see the big comment above) — keeping
-  // it off while confirming the flicker is fully gone, rather than re-adding several things at once.
-  /*
-  // Keep the diver roughly in view without position:fixed: `top` in style.css is a fixed
-  // document-relative position (58vh, never touched again after this point — changing `top` on
-  // every scroll event forces a layout recalculation each time, which turned out to be part of what
-  // made the whole page flicker while scrolling on nastuki's laptop). Instead, shift it back down by
-  // exactly however far the page has scrolled, via a transform (composite-only, no layout), so it
-  // still lands at the same spot in the viewport regardless of scroll position.
-  function positionDiver(){ el.style.setProperty('--diver-scroll-y', window.scrollY + 'px'); }
-  positionDiver();
-  window.addEventListener('scroll', positionDiver, { passive:true });
-
-  // Scroll direction: `current` eases toward +1 while scrolling up, -1 while scrolling down, and
-  // back to 0 shortly after scrolling stops (a tiny rAF loop, so it doesn't jump). It drives two
-  // CSS vars, written onto the diver element ITSELF (not document.documentElement — confirmed on
-  // nastuki's laptop that writing a custom property on <html> during scroll, up to 60x/sec, was what
-  // made the whole page flicker while scrolling; scoping it to this one element fixed it):
-  //  --diver-lift (px): moves the diver up the screen while current>0, down while current<0.
-  //  --diver-tilt (deg): the diver's artwork already leans "up" at rest (head trailing up-left,
-  //    fins down-right): a small rotation the other way just looks sideways, but rotating it much
-  //    further (past horizontal, toward nose-first) reads clearly as diving down — hence the
-  //    asymmetric range below (a wide swing down, a smaller one up).
-  // The window (not an inner div) is what scrolls.
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  let lastY = window.scrollY, current = 0, target = 0, raf = null, stopTimer = null;
-  function tick(){
-    current += (target - current) * 0.12;
-    if(Math.abs(target - current) < 0.01) current = target;
-    el.style.setProperty('--diver-lift', (-current * 34).toFixed(1) + 'px');
-    el.style.setProperty('--diver-tilt', ((current >= 0 ? current * 30 : current * 72)).toFixed(1) + 'deg');
-    raf = (current === target) ? null : requestAnimationFrame(tick);
-  }
-  function kick(){ if(raf === null) raf = requestAnimationFrame(tick); }
-  window.addEventListener('scroll', () => {
-    if(document.documentElement.dataset.design !== 'sea') return;
-    const y = window.scrollY;
-    if(y !== lastY) target = y > lastY ? -1 : 1;
-    lastY = y;
-    kick();
-    clearTimeout(stopTimer);
-    stopTimer = setTimeout(() => { target = 0; kick(); }, 400);
-  }, { passive:true });
-  */
 }
 
 // ---------- PWA: service worker registration ----------

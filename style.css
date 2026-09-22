@@ -668,38 +668,22 @@ html[data-design="sea"] .sea-layers{ display:block; }
 .sea-particles{ position:absolute; inset:0; }
 .sea-slot{ position:absolute; }
 
-/* Diver: a 30-frame flipbook (assets/diver/diver_00..29.png), always visible somewhere on screen.
-   It floats above the cards, on its own layer above .phone so the edge-to-edge cards on a phone
-   don't hide it, but below the tab bar and modals so it never sits on top of a button or a dialog.
-   Frame switching is done in script.js (initDiver): swapping background-image via CSS keyframes
-   turned out to render blank mid-flip in testing (background-image isn't a property browsers
-   reliably animate), so a small interval sets it directly instead.
-   position:absolute + a JS-tracked `top` (not position:fixed) — on one real laptop with hardware
-   acceleration off, a position:fixed element here made the WHOLE page render blank while every
-   element's computed position/size/color still checked out fine in devtools. script.js keeps `top`
-   in sync with scroll so it still stays roughly in view.
-   No CSS `animation` here (deliberately): on that same laptop the whole page would flicker in and
-   out of rendering correctly even at rest, with nothing being toggled — turned out to happen on its
-   own, at random, not tied to any single property. The common thread across everything running the
-   whole time was continuous repaint: the frame-flip interval below, plus what used to be an infinite
-   diver-drift CSS animation here. Dropping the infinite animation and only ever transforming this
-   element in direct response to a scroll event (see --diver-lift/--diver-tilt below) keeps it
-   perfectly still, and repainting only actually happening, other than while the user is scrolling. */
-.diver-companion{
-  display:none; position:absolute; z-index:15; pointer-events:none;
-  top:58vh; right:2%; width:88px; aspect-ratio:392/282;
+/* Diver: a 30-frame flipbook (assets/diver/diver_00..29.png), swimming in the corner of the hero
+   card. It used to float above every card as its own independent layer (position:fixed/absolute,
+   elevated z-index) so it'd stay visible regardless of scroll — on one real laptop (hardware
+   acceleration off, so Chrome falls back to software rendering), that made the WHOLE page flicker
+   blank at random while scrolling, no matter how much its own CSS/JS was pared back. It's a plain,
+   contained, in-flow decoration now, the same as .hero:before's circle — it scrolls away with the
+   hero card like anything else in it, but never causes trouble. Frame switching is done in script.js
+   (initDiver): swapping background-image via CSS keyframes rendered blank mid-flip in testing
+   (background-image isn't a property browsers reliably animate), so a small interval sets it directly
+   instead. */
+.hero-diver{
+  display:none; position:absolute; right:2px; bottom:2px; width:72px; aspect-ratio:392/282;
   background-repeat:no-repeat; background-size:contain; background-position:center;
-  opacity:.9;
-  filter:drop-shadow(0 8px 16px rgba(0,10,20,.4));
-  transform:translate(0, calc(var(--diver-scroll-y,0px) + var(--diver-lift,0px))) rotate(calc(-1deg + var(--diver-tilt,0deg)));
+  opacity:.9; pointer-events:none;
 }
-html[data-design="sea"] .diver-companion{ display:block; }
-/* --diver-lift (px) and --diver-tilt (deg) are set by JS (script.js) from the scroll direction and
-   eased so they don't jump; both settle back to 0 shortly after scrolling stops (and stay there,
-   untouched, the rest of the time). The diver's own artwork already leans "up" in its resting pose
-   (head trailing up-left, fins down-right), so rotating it further the same way reads clearly as
-   swimming up, but rotating it the other way just looks sideways rather than "down" — --diver-tilt is
-   asymmetric for that reason (see script.js). */
+html[data-design="sea"] .hero-diver{ display:block; }
 
 .phone{
   width:100%;
