@@ -804,7 +804,6 @@ function renderHome(){
         <div><div class="val">${fmtMin(heroWeekTotal)}</div><div class="lab">今週</div></div>
         <div><div class="val">${goal>0?fmtMin(goal):'未設定'}</div><div class="lab">今日の目標</div></div>
       </div>
-      <div class="hero-diver" aria-hidden="true"></div>
     </div>
 
     <div class="section-label">バランス</div>
@@ -2033,28 +2032,62 @@ function launchConfetti(){
   }, 50);
 }
 
-// ---------- diver: lives inside the hero card's own markup (.hero-diver in renderHome), not as an
-// independent overlay. It used to float above every card, positioned/fixed with its own elevated
-// z-index — on one real laptop (hardware acceleration off, so Chrome falls back to software
-// rendering), that made the WHOLE page flicker at random while scrolling, no matter how much its own
-// CSS/JS was pared back (no animation, no layout-touching properties, custom properties scoped to
-// itself, frame-flip paused during scroll — still flickered occasionally). What finally worked was
-// giving up on "always visible regardless of scroll" and just letting it be a normal, contained,
-// in-flow decoration — the same as any other decorative bit already inside a card, none of which
-// caused any trouble. It now scrolls away with the hero card like anything else in it.
-const DIVER_FRAME_COUNT = 30;
+// ---------- diver: a standalone element appended once to <body>, independent of render() ----------
+// Floats above the cards so it stays visible regardless of scroll (nastuki specifically wanted it to
+// follow scroll direction, not just sit still in one card). On one real laptop (hardware acceleration
+// off, so Chrome falls back to software rendering), an earlier version of this flickered the whole
+// page at random while scrolling — traced to a 5x/second interval that swapped its background-image
+// to animate a 30-frame swimming cycle, landing during scroll. That animation is gone: this is a
+// single static frame, never touched after its initial paint. Position/tilt tracking (below) turned
+// out NOT to be part of the problem — with the frame-flip interval gone entirely, scrolling was
+// confirmed stable.
 function initDiver(){
-  // Frame flip: a plain interval sets background-image directly (animating background-image via CSS
-  // keyframes rendered blank mid-flip in earlier testing). Re-queries .hero-diver every tick since
-  // render() recreates the hero card (and everything in it) on every state change.
-  let frame = 0;
-  setInterval(() => {
+  const el = document.createElement('div');
+  el.className = 'diver-companion';
+  el.setAttribute('aria-hidden', 'true');
+  el.style.backgroundImage = `url('assets/diver/diver_15.png')`;
+  document.body.appendChild(el);
+
+  // Keep the diver roughly in view without position:fixed: `top` in style.css is a fixed
+  // document-relative position (58vh, never touched again after this point — changing `top` on every
+  // scroll event forces a layout recalculation each time, which was one of the things that made the
+  // page flicker while scrolling before). Instead, shift it back down by exactly however far the page
+  // has scrolled, via a transform (composite-only, no layout), so it still lands at the same spot in
+  // the viewport regardless of scroll position.
+  function positionDiver(){ el.style.setProperty('--diver-scroll-y', window.scrollY + 'px'); }
+  positionDiver();
+  window.addEventListener('scroll', positionDiver, { passive:true });
+
+  // Scroll direction: `current` eases toward +1 while scrolling up, -1 while scrolling down, and
+  // back to 0 shortly after scrolling stops (a tiny rAF loop, so it doesn't jump). It drives two CSS
+  // vars, written onto the diver element ITSELF (not document.documentElement — a custom property
+  // changing on the root, which every element inherits, forces the engine to reconsider style for the
+  // whole subtree on every write; scoping it to this one element avoids that):
+  //  --diver-lift (px): moves the diver up the screen while current>0, down while current<0.
+  //  --diver-tilt (deg): the diver's artwork already leans "up" at rest (head trailing up-left, fins
+  //    down-right): a small rotation the other way just looks sideways, but rotating it much further
+  //    (past horizontal, toward nose-first) reads clearly as diving down — hence the asymmetric range
+  //    below (a wide swing down, a smaller one up).
+  // The window (not an inner div) is what scrolls.
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let lastY = window.scrollY, current = 0, target = 0, raf = null, stopTimer = null;
+  function tick(){
+    current += (target - current) * 0.12;
+    if(Math.abs(target - current) < 0.01) current = target;
+    el.style.setProperty('--diver-lift', (-current * 34).toFixed(1) + 'px');
+    el.style.setProperty('--diver-tilt', ((current >= 0 ? current * 30 : current * 72)).toFixed(1) + 'deg');
+    raf = (current === target) ? null : requestAnimationFrame(tick);
+  }
+  function kick(){ if(raf === null) raf = requestAnimationFrame(tick); }
+  window.addEventListener('scroll', () => {
     if(document.documentElement.dataset.design !== 'sea') return;
-    const el = document.querySelector('.hero-diver');
-    if(!el) return;
-    frame = (frame + 1) % DIVER_FRAME_COUNT;
-    el.style.backgroundImage = `url('assets/diver/diver_${String(frame).padStart(2,'0')}.png')`;
-  }, 1000/5);
+    const y = window.scrollY;
+    if(y !== lastY) target = y > lastY ? -1 : 1;
+    lastY = y;
+    kick();
+    clearTimeout(stopTimer);
+    stopTimer = setTimeout(() => { target = 0; kick(); }, 400);
+  }, { passive:true });
 }
 
 // ---------- PWA: service worker registration ----------

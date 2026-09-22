@@ -668,22 +668,28 @@ html[data-design="sea"] .sea-layers{ display:block; }
 .sea-particles{ position:absolute; inset:0; }
 .sea-slot{ position:absolute; }
 
-/* Diver: a 30-frame flipbook (assets/diver/diver_00..29.png), swimming in the corner of the hero
-   card. It used to float above every card as its own independent layer (position:fixed/absolute,
-   elevated z-index) so it'd stay visible regardless of scroll — on one real laptop (hardware
-   acceleration off, so Chrome falls back to software rendering), that made the WHOLE page flicker
-   blank at random while scrolling, no matter how much its own CSS/JS was pared back. It's a plain,
-   contained, in-flow decoration now, the same as .hero:before's circle — it scrolls away with the
-   hero card like anything else in it, but never causes trouble. Frame switching is done in script.js
-   (initDiver): swapping background-image via CSS keyframes rendered blank mid-flip in testing
-   (background-image isn't a property browsers reliably animate), so a small interval sets it directly
-   instead. */
-.hero-diver{
-  display:none; position:absolute; right:2px; bottom:2px; width:72px; aspect-ratio:392/282;
+/* Diver: a single static frame (assets/diver/diver_15.png), floating above the cards so it stays
+   visible and reacts to scroll direction (nastuki wanted it following scroll, not just sitting still
+   inside one card). On one real laptop (hardware acceleration off, so Chrome falls back to software
+   rendering), an earlier animated version of this (a 5x/second frame-flip interval cycling through 30
+   frames) made the WHOLE page flicker blank at random while scrolling. With that animation gone
+   entirely — just one unchanging image — scrolling was confirmed stable; position/tilt tracking below
+   was NOT itself the problem.
+   position:absolute + a JS-tracked scroll offset (not position:fixed — that alone reproduced the same
+   flicker on that laptop, confirmed by disabling just that one property in devtools). `top` is a fixed
+   58vh, never touched again after paint (changing it on scroll would force layout every time); the
+   scroll offset is folded into transform instead (composite-only, no layout). */
+.diver-companion{
+  display:none; position:absolute; z-index:15; pointer-events:none;
+  top:58vh; right:2%; width:88px; aspect-ratio:392/282;
   background-repeat:no-repeat; background-size:contain; background-position:center;
-  opacity:.9; pointer-events:none;
+  opacity:.9;
+  filter:drop-shadow(0 8px 16px rgba(0,10,20,.4));
+  transform:translate(0, calc(var(--diver-scroll-y,0px) + var(--diver-lift,0px))) rotate(calc(-1deg + var(--diver-tilt,0deg)));
 }
-html[data-design="sea"] .hero-diver{ display:block; }
+html[data-design="sea"] .diver-companion{ display:block; }
+/* --diver-lift (px) and --diver-tilt (deg): see script.js (initDiver) for how these are set and why
+   --diver-tilt's range is asymmetric (wide swing down, small swing up). */
 
 .phone{
   width:100%;
