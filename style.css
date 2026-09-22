@@ -695,6 +695,7 @@ html[data-design="sea"] .sea-layers{ display:block; }
   box-shadow:var(--shadow-primary);
 }
 .brand-mark svg rect{ fill:var(--color-on-primary); }
+.brand-mark svg circle{ stroke:var(--color-on-primary); stroke-width:1.8; opacity:.95; }
 .brand-text{font-family:var(--font-display); font-weight:900; font-size:var(--fs-body-lg); color:var(--color-text); letter-spacing:.3px; line-height:var(--lh-tight);}
 .brand-sub{font-size:var(--fs-caption); color:var(--color-faint); margin-top:2px;}
 

@@ -35,11 +35,13 @@ function icon(name, size=18, extraClass=''){
   const inner = ICON_PATHS[name] || '';
   return `<svg class="icon ${extraClass}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 }
+// Matches the app icon: a ring around the same ascending bars.
 function logomark(){
   return `<svg width="19" height="19" viewBox="0 0 24 24" fill="none">
-    <rect x="3.5" y="13" width="4.2" height="7.5" rx="1.4" fill="#fff" opacity=".85"/>
-    <rect x="9.9" y="8" width="4.2" height="12.5" rx="1.4" fill="#fff"/>
-    <rect x="16.3" y="3.5" width="4.2" height="17" rx="1.4" fill="#fff" opacity=".85"/>
+    <circle cx="12" cy="12" r="9.3" fill="none"/>
+    <rect x="7.9" y="14.8" width="1.9" height="4" rx=".95" opacity=".85"/>
+    <rect x="11" y="12.2" width="1.9" height="6.6" rx=".95"/>
+    <rect x="14.1" y="9" width="1.9" height="9.8" rx=".95" opacity=".85"/>
   </svg>`;
 }
 
