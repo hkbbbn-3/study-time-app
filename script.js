@@ -30,6 +30,8 @@ const ICON_PATHS = {
   arrowDown: '<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>',
   minus: '<path d="M5 12h14"/>',
   warning: '<path d="M12 3.5 21.5 20h-19Z"/><path d="M12 9.5v5"/><circle cx="12" cy="17.3" r="0.9" fill="currentColor" stroke="none"/>',
+  play: '<path d="M7 4.5v15l13-7.5Z" fill="currentColor" stroke="none"/>',
+  pause: '<rect x="6" y="4.5" width="4" height="15" rx="1.2" fill="currentColor" stroke="none"/><rect x="14" y="4.5" width="4" height="15" rx="1.2" fill="currentColor" stroke="none"/>',
 };
 function icon(name, size=18, extraClass=''){
   const inner = ICON_PATHS[name] || '';
@@ -59,6 +61,11 @@ let state = {
   design: 'calm',   // visual design: 'calm' | 'cute' | 'neon' | 'violet' | 'sea' (independent of light/dark)
   lastMemo: '', // pre-fills the memo field for the next new record
   balance: null,    // study-balance setup with history: {enabled, versions:[{from,savedOn,groups:[{id,name,subjectIds,target}]}]}, or null when never set up
+  // Live stopwatch, or null when nothing is running. Elapsed time is always computed from
+  // startedAt/accumulatedMs (never a counter that only ticks while the tab is open), so it survives
+  // a reload or the app being backgrounded correctly. confirming=true freezes it at finalMinutes,
+  // showing a save-with-memo step before it actually becomes a record.
+  timer: null, // {subjectIds,startDate,startedAt,accumulatedMs,running,confirming,finalMinutes}
 };
 
 const DESIGNS = [
@@ -78,6 +85,8 @@ let ui = {
   homeMonth: new Date().getMonth(),
   selectedDate: isoToday(),
   form: { date: isoToday(), subjectIds: [], hours: 1, minutes: 0, memo: '', editingId: null },
+  timerSubjectIds: [], // subjects picked before pressing start (record tab, timer card)
+  timerMemo: '', // memo field shown once the timer is stopped and awaiting confirmation
   rangeStart: (function(){ const d=new Date(); d.setDate(d.getDate()-6); return dateToISO(d); })(), // for the home screen's date-range total
   rangeEnd: isoToday(),
   rangeSubjectIds: null, // null means "all subjects"; becomes an explicit array once the user filters
@@ -132,7 +141,7 @@ function persist(){
   saveTimer=setTimeout(()=>{
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, design: state.design, balance: state.balance, lastMemo: state.lastMemo
+        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, design: state.design, balance: state.balance, lastMemo: state.lastMemo, timer: state.timer
       }));
     }catch(e){ console.error('save failed', e); showToast('保存に失敗しました'); }
   }, 150);
@@ -151,6 +160,7 @@ async function loadData(){
       const migratedBalance = migrateBalance(parsed.balance); // older saves: no balance (feature stays off) or an earlier single-setup shape
       if(migratedBalance) state.balance = migratedBalance;
       if(parsed.lastMemo) state.lastMemo = parsed.lastMemo;
+      if(parsed.timer && parsed.timer.subjectIds && parsed.timer.subjectIds.length) state.timer = parsed.timer;
     }
   }catch(e){
     // no existing data yet, or storage unavailable — use defaults
@@ -244,7 +254,7 @@ function render(){
         <div class="tab-indicator" style="transform:translateX(${tabIndex*100}%)"></div>
         ${tabBtn('home', icon('home',19), 'ホーム')}
         ${tabBtn('calendar', icon('calendar',19), 'カレンダー')}
-        ${tabBtn('record', icon('clock',19), '記録')}
+        ${tabBtn('record', icon('clock',19), '記録', state.timer && state.timer.running)}
         ${tabBtn('settings', icon('sliders',19), '設定')}
       </div>
     </div>
@@ -399,8 +409,8 @@ function openConfirm(title, desc, actionType, actionId, confirmLabel){
   render();
 }
 
-function tabBtn(key,icon,label){
-  return `<button data-action="go-tab" data-tab="${key}" class="${ui.tab===key?'active':''}">${icon}<span>${label}</span></button>`;
+function tabBtn(key,icon,label,showDot){
+  return `<button data-action="go-tab" data-tab="${key}" class="${ui.tab===key?'active':''}">${icon}${showDot?'<span class="tab-dot" aria-hidden="true"></span>':''}<span>${label}</span></button>`;
 }
 
 function renderPage(){
@@ -1039,6 +1049,77 @@ function recordItemHtml(r){
   `;
 }
 
+// ---------- timer (live stopwatch) ----------
+function timerElapsedMs(){
+  if(!state.timer) return 0;
+  return state.timer.accumulatedMs + (state.timer.running ? Date.now()-state.timer.startedAt : 0);
+}
+function fmtElapsed(ms){
+  const totalSec = Math.max(0, Math.floor(ms/1000));
+  const h = Math.floor(totalSec/3600), m = Math.floor((totalSec%3600)/60), s = totalSec%60;
+  const pad = n=>String(n).padStart(2,'0');
+  return h>0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+// Ticks the visible timer display directly (no render()) so it doesn't repaint anything else on
+// screen every second — only matters while the record tab is showing the running card.
+function tickTimerDisplay(){
+  if(!state.timer || !state.timer.running || state.timer.confirming) return;
+  const el = document.getElementById('timerDisplay');
+  if(el) el.textContent = fmtElapsed(timerElapsedMs());
+}
+
+function renderTimerCard(){
+  const t = state.timer;
+  if(!t){
+    return `
+    <div class="card">
+      <div class="card-title icon-row">${icon('play',15)} 今から記録する</div>
+      <div class="field">
+        <label class="field-label">科目（複数選択可）</label>
+        <div class="subject-pill-grid">
+          ${state.subjects.map(s=>{
+            const selected = ui.timerSubjectIds.includes(s.id);
+            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-timer-subject" data-id="${s.id}" style="--pc:${s.color};${selected?`background:${s.color};border-color:${s.color};`:''}">
+              <span class="dot" style="background:${selected?'#fff':s.color}"></span>${escapeHtml(s.name)}
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+      <button class="submit-btn icon-row" data-action="start-timer" ${ui.timerSubjectIds.length===0?'disabled':''}>${icon('play',15)} 開始する</button>
+      ${ui.timerSubjectIds.length===0 ? `<div class="submit-hint">↑ 科目を選んでください</div>` : ''}
+    </div>`;
+  }
+
+  if(t.confirming){
+    return `
+    <div class="card timer-card">
+      <div class="card-title icon-row">${icon('check',15)} 記録を確認</div>
+      <div class="timer-subjects">${t.subjectIds.map(id=>{ const s=subjectById(id); return `<span class="subject-pill" style="--pc:${s.color};background:${s.color};border-color:${s.color};"><span class="dot" style="background:#fff"></span>${escapeHtml(s.name)}</span>`; }).join('')}</div>
+      <div class="timer-display timer-display--done">${fmtMin(t.finalMinutes)}</div>
+      <div class="field" style="margin-top:var(--sp-4);">
+        <label class="field-label">メモ（任意）</label>
+        <textarea data-field="timer-memo" placeholder="やったことを一言メモ...">${escapeHtml(ui.timerMemo)}</textarea>
+      </div>
+      <button class="submit-btn icon-row" data-action="confirm-timer">${icon('check',15)} 記録する</button>
+      <div class="cancel-link" data-action="discard-timer">破棄する</div>
+    </div>`;
+  }
+
+  return `
+    <div class="card timer-card">
+      <div class="card-title icon-row">${icon('clock',15)} ${t.running ? '計測中' : '一時停止中'}</div>
+      <div class="timer-subjects">${t.subjectIds.map(id=>{ const s=subjectById(id); return `<span class="subject-pill" style="--pc:${s.color};background:${s.color};border-color:${s.color};"><span class="dot" style="background:#fff"></span>${escapeHtml(s.name)}</span>`; }).join('')}</div>
+      <div class="timer-display" id="timerDisplay">${fmtElapsed(timerElapsedMs())}</div>
+      <div class="timer-actions">
+        ${t.running
+          ? `<button class="ghost-btn icon-row" data-action="pause-timer">${icon('pause',15)} 一時停止</button>`
+          : `<button class="ghost-btn icon-row" data-action="resume-timer">${icon('play',15)} 再開</button>`}
+        <button class="submit-btn icon-row" data-action="finish-timer">${icon('check',15)} 終了する</button>
+      </div>
+      <div class="cancel-link" data-action="discard-timer">破棄して最初から</div>
+    </div>`;
+}
+
 // ---------- RECORD ----------
 function renderRecord(){
   const f = ui.form;
@@ -1048,8 +1129,9 @@ function renderRecord(){
   const minOptions = [0,10,20,30,40,50];
 
   return `
+    ${renderTimerCard()}
     <div class="card">
-      <div class="card-title icon-row">${isEditing ? icon('edit',15)+' 記録を編集' : icon('clock',15)+' 勉強時間を記録'}</div>
+      <div class="card-title icon-row">${isEditing ? icon('edit',15)+' 記録を編集' : icon('edit',15)+' あとから記録する'}</div>
 
       <div class="field">
         <label class="field-label">日付</label>
@@ -1490,6 +1572,60 @@ function onClick(e){
     }
     render(); return;
   }
+  if(action==='toggle-timer-subject'){
+    const id = btn.dataset.id;
+    ui.timerSubjectIds = ui.timerSubjectIds.includes(id) ? ui.timerSubjectIds.filter(x=>x!==id) : [...ui.timerSubjectIds, id];
+    render(); return;
+  }
+  if(action==='start-timer'){
+    if(ui.timerSubjectIds.length===0) return;
+    state.timer = { subjectIds:ui.timerSubjectIds, startDate:isoToday(), startedAt:Date.now(), accumulatedMs:0, running:true, confirming:false, finalMinutes:null };
+    ui.timerSubjectIds = [];
+    persist(); render(); return;
+  }
+  if(action==='pause-timer'){
+    if(!state.timer || !state.timer.running) return;
+    state.timer.accumulatedMs += Date.now() - state.timer.startedAt;
+    state.timer.running = false;
+    persist(); render(); return;
+  }
+  if(action==='resume-timer'){
+    if(!state.timer || state.timer.running) return;
+    state.timer.startedAt = Date.now();
+    state.timer.running = true;
+    persist(); render(); return;
+  }
+  if(action==='finish-timer'){
+    if(!state.timer) return;
+    const mins = Math.max(1, Math.round(timerElapsedMs()/60000));
+    state.timer.accumulatedMs = timerElapsedMs();
+    state.timer.running = false;
+    state.timer.confirming = true;
+    state.timer.finalMinutes = mins;
+    ui.timerMemo = state.lastMemo || '';
+    persist(); render(); return;
+  }
+  if(action==='confirm-timer'){
+    const t = state.timer;
+    if(!t || !t.confirming) return;
+    t.subjectIds.forEach(subjectId=>{
+      state.records.push({ id: uid(), date:t.startDate, subjectId, minutes:t.finalMinutes, memo:ui.timerMemo });
+    });
+    state.lastMemo = ui.timerMemo;
+    state.timer = null;
+    persist();
+    const goalNowMet = goalFor(t.startDate)>0 && totalOn(t.startDate) >= goalFor(t.startDate);
+    render();
+    showToast(t.subjectIds.length>1 ? `${t.subjectIds.length}件の記録をしました` : '記録しました');
+    if(goalNowMet && t.startDate===isoToday()) launchConfetti();
+    return;
+  }
+  if(action==='discard-timer'){
+    state.timer = null;
+    persist(); render();
+    showToast('破棄しました');
+    return;
+  }
   if(action==='toggle-range-subject'){
     const id = btn.dataset.id;
     const current = ui.rangeSubjectIds===null ? state.subjects.map(s=>s.id) : ui.rangeSubjectIds;
@@ -1665,6 +1801,7 @@ function onChange(e){
   if(field==='hours'){ ui.form.hours = Number(e.target.value); syncSubmitState(); return; }
   if(field==='minutes'){ ui.form.minutes = Number(e.target.value); syncSubmitState(); return; }
   if(field==='memo'){ ui.form.memo = e.target.value; return; }
+  if(field==='timer-memo'){ ui.timerMemo = e.target.value; return; }
   if(field==='subject-edit-name'){ ui.subjectEditor.name = e.target.value; return; }
   if(state.balance && field==='balance-name'){
     // A name is just a label, so a rename applies to every version of that group (it is not a history event).
@@ -2047,6 +2184,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
 (async function init(){
   await loadData();
   render();
+  setInterval(tickTimerDisplay, 1000);
 })();
 
 })();
