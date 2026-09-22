@@ -683,13 +683,15 @@ html[data-design="sea"] .sea-layers{ display:block; }
   animation: diver-drift 26s ease-in-out infinite alternate;
 }
 html[data-design="sea"] .diver-companion{ display:block; }
-/* --diver-scroll is a plain number from -1 (scrolling up) to 1 (scrolling down), eased by JS in
-   script.js. It tilts the diver to face the direction it's swimming and nudges it along that way;
-   it settles back to 0 when scrolling stops. */
+/* --diver-lift (px) and --diver-tilt (deg) are set by JS (script.js) from the scroll direction and
+   eased so they don't jump; both settle back to 0 shortly after scrolling stops. The diver's own
+   artwork already leans "up" in its resting pose (head trailing up-left, fins down-right), so
+   rotating it further the same way reads clearly as swimming up, but rotating it the other way just
+   looks sideways rather than "down" — --diver-tilt is asymmetric for that reason (see script.js). */
 @keyframes diver-drift{
-  0%{ transform:translate(0, calc(var(--diver-scroll,0) * 30px)) rotate(calc(-2deg + var(--diver-scroll,0) * 26deg)); }
-  50%{ transform:translate(-30px, calc(36px + var(--diver-scroll,0) * 30px)) rotate(calc(3deg + var(--diver-scroll,0) * 26deg)); }
-  100%{ transform:translate(-10px, calc(-30px + var(--diver-scroll,0) * 30px)) rotate(calc(-1deg + var(--diver-scroll,0) * 26deg)); }
+  0%{ transform:translate(0, calc(var(--diver-lift,0px))) rotate(calc(-2deg + var(--diver-tilt,0deg))); }
+  50%{ transform:translate(-30px, calc(36px + var(--diver-lift,0px))) rotate(calc(3deg + var(--diver-tilt,0deg))); }
+  100%{ transform:translate(-10px, calc(-30px + var(--diver-lift,0px))) rotate(calc(-1deg + var(--diver-tilt,0deg))); }
 }
 
 .phone{

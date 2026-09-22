@@ -2051,22 +2051,28 @@ function initDiver(){
     el.style.backgroundImage = `url('assets/diver/diver_${String(frame).padStart(2,'0')}.png')`;
   }, 1000/5);
 
-  // Scroll tilt: --diver-scroll is a plain number from -1 (swimming up) to 1 (swimming down), read
-  // by the diver-drift keyframes in style.css. Eased with a tiny rAF loop so it doesn't jump, and
-  // settles back to 0 shortly after scrolling stops. The window (not an inner div) is what scrolls.
+  // Scroll direction: `current` eases toward +1 while scrolling up, -1 while scrolling down, and
+  // back to 0 shortly after scrolling stops (a tiny rAF loop, so it doesn't jump). It drives two
+  // CSS vars the diver-drift keyframes in style.css read:
+  //  --diver-lift (px): moves the diver up the screen while current>0, down while current<0.
+  //  --diver-tilt (deg): the diver's artwork already leans "up" at rest (head trailing up-left,
+  //    fins down-right), so rotating it further that way reads clearly as swimming up — rotating it
+  //    the other way just looks sideways rather than "down" — hence the asymmetric range below.
+  // The window (not an inner div) is what scrolls.
   if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   let lastY = window.scrollY, current = 0, target = 0, raf = null, stopTimer = null;
   function tick(){
     current += (target - current) * 0.12;
     if(Math.abs(target - current) < 0.01) current = target;
-    document.documentElement.style.setProperty('--diver-scroll', current.toFixed(3));
+    document.documentElement.style.setProperty('--diver-lift', (-current * 34).toFixed(1) + 'px');
+    document.documentElement.style.setProperty('--diver-tilt', ((current >= 0 ? current * 30 : current * 12)).toFixed(1) + 'deg');
     raf = (current === target) ? null : requestAnimationFrame(tick);
   }
   function kick(){ if(raf === null) raf = requestAnimationFrame(tick); }
   window.addEventListener('scroll', () => {
     if(document.documentElement.dataset.design !== 'sea') return;
     const y = window.scrollY;
-    if(y !== lastY) target = y > lastY ? 1 : -1;
+    if(y !== lastY) target = y > lastY ? -1 : 1;
     lastY = y;
     kick();
     clearTimeout(stopTimer);
