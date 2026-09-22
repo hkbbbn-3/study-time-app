@@ -226,10 +226,6 @@ function render(){
       <div class="sea-light"></div>
       <div class="sea-particles"></div>
     </div>
-    <!-- The diver swims as a floating companion above the cards (not behind them, like the rest of
-         .sea-layers) — on a phone the cards fill the screen edge to edge, so anything mounted behind
-         them would almost never be visible. -->
-    <div class="diver-companion" aria-hidden="true"></div>
     <div class="phone">
       <div class="topbar">
         <div class="brand">
@@ -2036,17 +2032,24 @@ function launchConfetti(){
   }, 50);
 }
 
-// ---------- diver: swims via .diver-companion, always re-queried since render() replaces it ----------
+// ---------- diver: a standalone element appended once to <body>, independent of render() ----------
+// It used to be part of render()'s template inside #canvas, alongside .mesh/.sea-layers/.phone —
+// on one real device that made the WHOLE page render blank (only the diver visible) even though
+// every element's computed position/size/color checked out fine, so something about having this
+// fixed, animated, frequently-repainted layer as a sibling inside that stacking context broke
+// painting there. Living on <body> directly, outside #canvas entirely, avoids that.
 const DIVER_FRAME_COUNT = 30;
 function initDiver(){
+  const el = document.createElement('div');
+  el.className = 'diver-companion';
+  el.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(el);
+
   // Frame flip: a plain interval sets background-image directly. (Animating background-image via
-  // CSS keyframes rendered blank mid-flip in testing — background-image isn't reliably animatable —
-  // so this avoids that instead of fighting it. Re-querying the element each tick means it keeps
-  // working across the app's full re-renders without needing to re-attach anything.)
+  // CSS keyframes rendered blank mid-flip in earlier testing — background-image isn't reliably
+  // animatable — so this avoids that instead of fighting it.)
   let frame = 0;
   setInterval(() => {
-    const el = document.querySelector('.diver-companion');
-    if(!el) return;
     frame = (frame + 1) % DIVER_FRAME_COUNT;
     el.style.backgroundImage = `url('assets/diver/diver_${String(frame).padStart(2,'0')}.png')`;
   }, 1000/5);
