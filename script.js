@@ -66,6 +66,7 @@ let state = {
   // a reload or the app being backgrounded correctly. confirming=true freezes it at finalMinutes,
   // showing a save-with-memo step before it actually becomes a record.
   timer: null, // {subjectIds,startDate,startedAt,accumulatedMs,running,confirming,finalMinutes}
+  deadlines: [], // {id,label,date} — target dates like an exam, shown as a countdown on the home screen
 };
 
 const DESIGNS = [
@@ -98,6 +99,7 @@ let ui = {
   confirm: null, // { title, desc, actionType, actionId }
   datePicker: null, // { year, month, target } when open — target is 'record', 'rangeStart', or 'rangeEnd'
   subjectEditor: null, // { id, name, color } when editing a subject
+  deadlineEditor: null, // { id, label, date } when adding/editing a target date (id=null for a new one)
 };
 
 function isoToday(){ return dateToISO(new Date()); }
@@ -125,6 +127,22 @@ function fmtMinHtml(total){
   return part(h,'時間') + part(m,'分');
 }
 function subjectById(id){ return state.subjects.find(s=>s.id===id) || {name:'(削除済み)', color:'#999'}; }
+// Whole calendar days between today and an ISO date (negative once it's passed). Both dates are
+// treated as local midnight, so this isn't affected by the time of day "now" happens to be.
+function daysUntil(iso){
+  const ms = isoToDate(iso) - isoToDate(isoToday());
+  return Math.round(ms / 86400000);
+}
+// Upcoming deadlines (today or later) soonest-first, then past ones most-recently-passed-first —
+// so whichever deadlines are actually still relevant surface at the top of the settings list.
+function sortedDeadlines(){
+  const today = isoToday();
+  return [...state.deadlines].sort((a,b)=>{
+    const aFuture = a.date>=today, bFuture = b.date>=today;
+    if(aFuture!==bFuture) return aFuture ? -1 : 1;
+    return aFuture ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+  });
+}
 function recordsOn(iso){ return state.records.filter(r=>r.date===iso); }
 function totalOn(iso){ return recordsOn(iso).reduce((a,r)=>a+r.minutes,0); }
 
@@ -141,7 +159,7 @@ function persist(){
   saveTimer=setTimeout(()=>{
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, design: state.design, balance: state.balance, lastMemo: state.lastMemo, timer: state.timer
+        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, design: state.design, balance: state.balance, lastMemo: state.lastMemo, timer: state.timer, deadlines: state.deadlines
       }));
     }catch(e){ console.error('save failed', e); showToast('保存に失敗しました'); }
   }, 150);
@@ -161,6 +179,7 @@ async function loadData(){
       if(migratedBalance) state.balance = migratedBalance;
       if(parsed.lastMemo) state.lastMemo = parsed.lastMemo;
       if(parsed.timer && parsed.timer.subjectIds && parsed.timer.subjectIds.length) state.timer = parsed.timer;
+      if(Array.isArray(parsed.deadlines)) state.deadlines = parsed.deadlines;
     }
   }catch(e){
     // no existing data yet, or storage unavailable — use defaults
@@ -259,8 +278,9 @@ function render(){
       </div>
     </div>
     ${ui.confirm ? renderConfirmModal() : ''}
-    ${ui.datePicker ? renderDatePicker() : ''}
     ${ui.subjectEditor ? renderSubjectEditor() : ''}
+    ${ui.deadlineEditor ? renderDeadlineEditor() : ''}
+    ${ui.datePicker ? renderDatePicker() : ''}
   `;
   document.getElementById('content').innerHTML = renderPage();
   bindEvents();
@@ -278,6 +298,7 @@ function closeAnyModal(){
   }
   if(ui.datePicker){ ui.datePicker = null; render(); return true; }
   if(ui.subjectEditor){ ui.subjectEditor = null; render(); return true; }
+  if(ui.deadlineEditor){ ui.deadlineEditor = null; render(); return true; }
   return false;
 }
 
@@ -310,6 +331,7 @@ function currentDateForTarget(target){
   }
   if(target==='rangeStart') return ui.rangeStart;
   if(target==='rangeEnd') return ui.rangeEnd;
+  if(target==='deadlineEditor') return ui.deadlineEditor.date;
   return ui.form.date;
 }
 
@@ -381,6 +403,43 @@ function renderSubjectEditor(){
         <div class="modal-actions">
           <button class="modal-btn cancel" data-action="cancel-subject-edit">キャンセル</button>
           <button class="modal-btn primary" data-action="save-subject-edit">保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function openDeadlineEditor(id){
+  if(id){
+    const d = state.deadlines.find(x=>x.id===id);
+    if(!d) return;
+    ui.deadlineEditor = { id, label:d.label, date:d.date };
+  } else {
+    ui.deadlineEditor = { id:null, label:'', date:isoToday() };
+  }
+  render();
+}
+
+function renderDeadlineEditor(){
+  const de = ui.deadlineEditor;
+  return `
+    <div class="modal-overlay" data-action="cancel-deadline-edit">
+      <div class="modal-box" data-action="stop" role="dialog" aria-modal="true" aria-label="目標日を${de.id?'編集':'追加'}">
+        <div class="modal-title">目標日を${de.id?'編集':'追加'}</div>
+        <div class="field" style="text-align:left; margin-top:16px;">
+          <label class="field-label">名前</label>
+          <input class="input" type="text" data-field="deadline-edit-label" placeholder="例：簿記2級試験" value="${escapeHtml(de.label)}">
+        </div>
+        <div class="field" style="text-align:left;">
+          <label class="field-label">日付</label>
+          <div class="date-field icon-row" data-action="open-date-picker" data-target="deadlineEditor" role="button" tabindex="0">
+            <span>${formatDateFull(de.date)}</span>
+            ${icon('calendar',16)}
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn cancel" data-action="cancel-deadline-edit">キャンセル</button>
+          <button class="modal-btn primary" data-action="save-deadline-edit" ${de.label.trim()===''?'disabled':''}>保存</button>
         </div>
       </div>
     </div>
@@ -679,6 +738,30 @@ function renderBalanceHome(){
     </div>`;
 }
 
+// Upcoming (today or later) target dates, soonest first. Hidden entirely once nothing is upcoming,
+// rather than showing an empty section — past deadlines just quietly stop appearing here (they're
+// still editable/deletable in Settings).
+function renderDeadlineHome(){
+  const today = isoToday();
+  const upcoming = state.deadlines.filter(d=>d.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
+  if(upcoming.length===0) return '';
+  return `
+    <div class="section-label icon-row" style="justify-content:flex-start">${icon('calendar',13)} 目標日</div>
+    <div class="card deadline-home-card">
+      ${upcoming.map(d=>{
+        const days = daysUntil(d.date);
+        return `
+        <div class="deadline-row">
+          <div class="deadline-info">
+            <div class="name">${escapeHtml(d.label)}</div>
+            <div class="deadline-date">${formatDateFull(d.date)}</div>
+          </div>
+          <div class="deadline-countdown ${days<=7?'is-close':''}">${days===0 ? '今日' : `あと${days}日`}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
 function renderHome(){
   const today = isoToday();
   const goal = goalFor(today);
@@ -817,6 +900,8 @@ function renderHome(){
         <div><div class="val">${goal>0?fmtMin(goal):'未設定'}</div><div class="lab">今日の目標</div></div>
       </div>
     </div>
+
+    ${renderDeadlineHome()}
 
     <div class="section-label">バランス</div>
     ${renderBalanceHome()}
@@ -1244,6 +1329,25 @@ function renderSettings(){
       <button class="submit-btn" style="margin-top:14px" data-action="save-goals">目標時間を保存</button>
     </div>
 
+    <div class="section-label icon-row" style="justify-content:flex-start">${icon('calendar',13)} 目標日</div>
+    <div class="card">
+      ${sortedDeadlines().map(d=>{
+        const days = daysUntil(d.date);
+        const status = days>0 ? `あと${days}日` : days===0 ? '今日' : '終了';
+        return `
+        <div class="subject-chip deadline-chip ${days<0?'is-past':''}">
+          <div class="deadline-info">
+            <div class="name">${escapeHtml(d.label)}</div>
+            <div class="deadline-date">${formatDateFull(d.date)}・${status}</div>
+          </div>
+          <button data-action="edit-deadline" data-id="${d.id}" aria-label="「${escapeHtml(d.label)}」を編集">${icon('edit',13)}</button>
+          <button data-action="delete-deadline" data-id="${d.id}" aria-label="「${escapeHtml(d.label)}」を削除">${icon('x',13)}</button>
+        </div>`;
+      }).join('')}
+      ${state.deadlines.length===0 ? `<div class="empty" style="padding:6px 0 14px;">試験日などの目標を設定すると、ホームにカウントダウンが出ます</div>` : ''}
+      <button class="ghost-btn icon-row" style="margin-top:${state.deadlines.length?'2px':'0'}" data-action="add-deadline">${icon('plus',15)} 目標日を追加</button>
+    </div>
+
     <div class="section-label icon-row" style="justify-content:flex-start">${icon('book',13)} 科目の設定</div>
     <div class="card">
       ${state.subjects.map((s,idx)=>`
@@ -1560,6 +1664,32 @@ function onClick(e){
     ui.subjectEditor = null;
     render(); return;
   }
+  if(action==='add-deadline'){ openDeadlineEditor(null); return; }
+  if(action==='edit-deadline'){ openDeadlineEditor(btn.dataset.id); return; }
+  if(action==='cancel-deadline-edit'){
+    closeAnyModal(); return;
+  }
+  if(action==='save-deadline-edit'){
+    const de = ui.deadlineEditor;
+    const label = de.label.trim();
+    if(!label){ showToast('名前を入力してください'); return; }
+    if(de.id){
+      const d = state.deadlines.find(x=>x.id===de.id);
+      if(d){ d.label = label; d.date = de.date; }
+      showToast('目標日を更新しました');
+    } else {
+      state.deadlines.push({ id: uid(), label, date: de.date });
+      showToast('目標日を追加しました');
+    }
+    persist();
+    ui.deadlineEditor = null;
+    render(); return;
+  }
+  if(action==='delete-deadline'){
+    const d = state.deadlines.find(x=>x.id===btn.dataset.id);
+    if(d) openConfirm(`「${d.label}」を削除しますか？`, 'この目標日を削除します。', 'deadline', btn.dataset.id);
+    return;
+  }
   if(action==='toggle-subject-select'){
     const id = btn.dataset.id;
     if(ui.form.editingId){
@@ -1659,6 +1789,7 @@ function onClick(e){
     if(target.startsWith('balanceFrom:')){ setBalanceVersionStart(Number(target.split(':')[1]), btn.dataset.date); ui.datePicker = null; render(); return; }
     if(target==='rangeStart') ui.rangeStart = btn.dataset.date;
     else if(target==='rangeEnd') ui.rangeEnd = btn.dataset.date;
+    else if(target==='deadlineEditor') ui.deadlineEditor.date = btn.dataset.date;
     else ui.form.date = btn.dataset.date;
     ui.datePicker = null;
     render(); return;
@@ -1677,6 +1808,10 @@ function onClick(e){
       ui.form.subjectIds = ui.form.subjectIds.filter(id=>id!==c.actionId);
       persist();
       showToast('科目を削除しました');
+    } else if(c && c.actionType==='deadline'){
+      state.deadlines = state.deadlines.filter(d=>d.id!==c.actionId);
+      persist();
+      showToast('目標日を削除しました');
     } else if(c && c.actionType==='balance-version' && state.balance && state.balance.versions.length>1){
       state.balance.versions.splice(c.actionId, 1);
       ui.balanceEditIdx = null;
@@ -1803,6 +1938,7 @@ function onChange(e){
   if(field==='memo'){ ui.form.memo = e.target.value; return; }
   if(field==='timer-memo'){ ui.timerMemo = e.target.value; return; }
   if(field==='subject-edit-name'){ ui.subjectEditor.name = e.target.value; return; }
+  if(field==='deadline-edit-label'){ ui.deadlineEditor.label = e.target.value; return; }
   if(state.balance && field==='balance-name'){
     // A name is just a label, so a rename applies to every version of that group (it is not a history event).
     const cur = balanceEditing().groups[Number(e.target.dataset.index)];
