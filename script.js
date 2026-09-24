@@ -1158,7 +1158,8 @@ function renderTimerCard(){
   if(!t){
     return `
     <div class="card">
-      <div class="card-title icon-row">${icon('play',15)} 今から記録する</div>
+      <div class="card-title icon-row">${icon('play',15)} タイマーで記録</div>
+      <div class="card-desc">勉強しながら時間を測ります。「開始」を押して、終わったら「終了」を押すだけ。</div>
       <div class="field">
         <label class="field-label">科目（複数選択可）</label>
         <div class="subject-pill-grid">
@@ -1170,7 +1171,7 @@ function renderTimerCard(){
           }).join('')}
         </div>
       </div>
-      <button class="submit-btn icon-row" data-action="start-timer" ${ui.timerSubjectIds.length===0?'disabled':''}>${icon('play',15)} 開始する</button>
+      <button class="submit-btn icon-row" data-action="start-timer" ${ui.timerSubjectIds.length===0?'disabled':''}>${icon('play',15)} タイマーを開始</button>
       ${ui.timerSubjectIds.length===0 ? `<div class="submit-hint">↑ 科目を選んでください</div>` : ''}
     </div>`;
   }
@@ -1216,7 +1217,8 @@ function renderRecord(){
   return `
     ${renderTimerCard()}
     <div class="card">
-      <div class="card-title icon-row">${isEditing ? icon('edit',15)+' 記録を編集' : icon('edit',15)+' あとから記録する'}</div>
+      <div class="card-title icon-row">${isEditing ? icon('edit',15)+' 記録を編集' : icon('edit',15)+' 時間を入力して記録'}</div>
+      ${isEditing ? '' : `<div class="card-desc">勉強した時間を自分で入力します。終わった勉強や、過去の日の記録もOK。</div>`}
 
       <div class="field">
         <label class="field-label">日付</label>

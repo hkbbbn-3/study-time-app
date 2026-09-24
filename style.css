@@ -735,6 +735,11 @@ html[data-design="sea"] .sea-layers{ display:block; }
   font-size:var(--fs-body); font-weight:700; color:var(--color-muted);
   margin:0 0 var(--sp-3); display:flex; align-items:center; justify-content:flex-start; gap:var(--sp-2);
 }
+/* One-line explanation right under a card title, so a first-time user knows what the card does. */
+.card-desc{
+  font-size:var(--fs-caption); color:var(--color-faint); line-height:1.6;
+  margin:calc(var(--sp-1) * -1) 0 var(--sp-4);
+}
 .section-label{
   font-size:var(--fs-body); font-weight:700; color:var(--color-muted);
   margin:var(--sp-6) var(--sp-1) var(--sp-3);
