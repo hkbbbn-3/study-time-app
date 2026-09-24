@@ -345,7 +345,7 @@ function renderDatePicker(){
   const selIso = currentDateForTarget(dp.target);
 
   let cells = '';
-  const totalCells = Math.ceil((startOffset+daysInMonth)/7)*7;
+  const totalCells = 42; // always 6 rows so the month-nav buttons stay put between months
   for(let i=0;i<totalCells;i++){
     const dayNum = i - startOffset + 1;
     if(dayNum<1 || dayNum>daysInMonth){
