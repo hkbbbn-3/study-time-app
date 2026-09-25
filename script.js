@@ -153,23 +153,41 @@ function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toStrin
 // Live Server, etc.), so we use the browser's standard localStorage rather than any
 // environment-specific API. Data is stored per-origin/per-file in the browser you open it in.
 const STORAGE_KEY = 'study-app-data';
+// Shape of the saved data. Bump this when the format changes and add a step to migrateSaved().
+const SCHEMA_VERSION = 1;
 let saveTimer=null;
+function flushSave(){
+  clearTimeout(saveTimer);
+  saveTimer=null;
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      version: SCHEMA_VERSION,
+      subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, design: state.design, balance: state.balance, lastMemo: state.lastMemo, timer: state.timer, deadlines: state.deadlines
+    }));
+  }catch(e){ console.error('save failed', e); showToast('保存に失敗しました'); }
+}
 function persist(){
   clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>{
-    try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        subjects: state.subjects, records: state.records, goals: state.goals, theme: state.theme, design: state.design, balance: state.balance, lastMemo: state.lastMemo, timer: state.timer, deadlines: state.deadlines
-      }));
-    }catch(e){ console.error('save failed', e); showToast('保存に失敗しました'); }
-  }, 150);
+  saveTimer=setTimeout(flushSave, 150);
+}
+// Closing the tab or switching apps within 150ms of a change would lose it, so write any pending save right away.
+function flushPendingSave(){ if(saveTimer!==null) flushSave(); }
+window.addEventListener('pagehide', flushPendingSave);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushPendingSave(); });
+
+// Entry point for format changes: saves without a "version" are version 0 (the shape before versioning);
+// version 1 is the current shape, so nothing to convert yet.
+function migrateSaved(parsed){
+  const v = Number(parsed.version) || 0;
+  // if(v < 2){ ...convert to version 2... }
+  return parsed;
 }
 
 async function loadData(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
-      const parsed = JSON.parse(raw);
+      const parsed = migrateSaved(JSON.parse(raw));
       if(parsed.subjects && parsed.subjects.length) state.subjects = parsed.subjects;
       if(parsed.records) state.records = parsed.records;
       if(parsed.goals) state.goals = parsed.goals;
@@ -2003,7 +2021,7 @@ function saveGoalsFromForm(){
 }
 
 function exportJson(){
-  const data = JSON.stringify({subjects:state.subjects, records:state.records, goals:state.goals}, null, 2);
+  const data = JSON.stringify({version:SCHEMA_VERSION, subjects:state.subjects, records:state.records, goals:state.goals}, null, 2);
   downloadBlob(data, 'study-time-backup.json', 'application/json');
   showToast('バックアップを書き出しました');
 }
