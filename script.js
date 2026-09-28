@@ -91,6 +91,8 @@ let ui = {
   rangeStart: (function(){ const d=new Date(); d.setDate(d.getDate()-6); return dateToISO(d); })(), // for the home screen's date-range total
   rangeEnd: isoToday(),
   rangeSubjectIds: null, // null means "all subjects"; becomes an explicit array once the user filters
+  rangeMode: 'subject', // 'subject' | 'group' — the range card totals by subject or by balance group
+  rangeGroupIds: null, // null means "all groups"; becomes an explicit array once the user filters
   balanceEditIdx: null, // index of a history entry being corrected directly from the history list (overrides the apply date)
   balanceApplyFrom: null, // ISO date the Settings edits apply from (null = today); shows the setup in force on that day
   weekDay: null, // ISO date of the tapped bar in the week card (shows that day breakdown by subject)
@@ -535,11 +537,7 @@ function migrateBalance(raw){
 
 function balanceCurrent(){ const vs = state.balance.versions; return vs[vs.length-1]; }
 // The setup that applied on a given day (days before the first version use the first one).
-function balanceVersionFor(iso){
-  let v = state.balance.versions[0];
-  state.balance.versions.forEach(x=>{ if(x.from<=iso) v = x; });
-  return v;
-}
+function balanceVersionFor(iso){ return RangeTotal.versionAt(state.balance.versions, iso); }
 // The day the Settings edits apply from: today unless one was picked (never in the future).
 function balanceApplyDate(){ const d = ui.balanceApplyFrom; return (d && d<=isoToday()) ? d : isoToday(); }
 // The setup that was in force on that day; this is what the Settings form shows and edits.
@@ -881,8 +879,6 @@ function renderHome(){
   const maxSubj = subjEntries.length ? subjEntries[0][1] : 1;
 
   const allTime = computeAllTimeStats();
-  const rangeSubjectIds = ui.rangeSubjectIds===null ? state.subjects.map(s=>s.id) : ui.rangeSubjectIds;
-  const range = computeRangeTotal(ui.rangeStart, ui.rangeEnd, rangeSubjectIds);
 
   return `
     <div class="hero ${achieved ? 'hero-achieved' : ''}">
@@ -1026,6 +1022,42 @@ function renderHome(){
           ${icon('calendar',14)}
         </div>
       </div>
+      ${renderRangeBody()}
+    </div>
+  `;
+}
+
+function computeAllTimeStats(){
+  if(state.records.length===0) return { totalMinutes:0, dayCount:0, firstDateLabel:'―' };
+  const totalMinutes = state.records.reduce((a,r)=>a+r.minutes,0);
+  const dayCount = new Set(state.records.map(r=>r.date)).size;
+  const firstDate = state.records.reduce((min,r)=> r.date<min?r.date:min, state.records[0].date);
+  const d = isoToDate(firstDate);
+  return { totalMinutes, dayCount, firstDateLabel: `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日` };
+}
+
+// Sums minutes across [startIso, endIso] inclusive for the given subjects, tolerating
+// the range being given backwards (see range-total.js).
+function computeRangeTotal(startIso, endIso, subjectIds){
+  return RangeTotal.rangeSubjectTotal(state.records, startIso, endIso, subjectIds);
+}
+
+// Group totals are only offered while the balance feature is on.
+function rangeGroupsAvailable(){ return !!state.balance && state.balance.enabled!==false; }
+function rangeGroupTotals(){ return RangeTotal.rangeGroupTotals(state.records, state.balance, ui.rangeStart, ui.rangeEnd); }
+
+// The range card below the dates: subject pills + total, or group pills + total + a per-group breakdown.
+function renderRangeBody(){
+  const groupMode = ui.rangeMode==='group' && rangeGroupsAvailable();
+  const tabs = rangeGroupsAvailable() ? `
+      <div class="balance-tabs range-tabs" role="group" aria-label="集計の単位">
+        <button type="button" class="${groupMode?'':'active'}" data-action="range-mode" data-mode="subject" aria-pressed="${!groupMode}">科目</button>
+        <button type="button" class="${groupMode?'active':''}" data-action="range-mode" data-mode="group" aria-pressed="${groupMode}">グループ</button>
+      </div>` : '';
+  if(!groupMode){
+    const rangeSubjectIds = ui.rangeSubjectIds===null ? state.subjects.map(s=>s.id) : ui.rangeSubjectIds;
+    const range = computeRangeTotal(ui.rangeStart, ui.rangeEnd, rangeSubjectIds);
+    return `${tabs}
       <div class="field" style="margin:14px 0 0;">
         <label class="field-label">科目${rangeSubjectIds.length===state.subjects.length?'':'（絞り込み中）'}</label>
         <div class="subject-pill-grid">
@@ -1042,35 +1074,41 @@ function renderHome(){
           ? `<div class="empty" style="padding:10px 0;">科目を選んでください</div>`
           : `<div class="v">${fmtMin(range.total)}</div>
              <div class="l">${range.dayCount}日間の合計（1日平均 ${fmtMin(Math.round(range.total/range.dayCount))}）</div>`}
-      </div>
-    </div>
-  `;
-}
-
-function computeAllTimeStats(){
-  if(state.records.length===0) return { totalMinutes:0, dayCount:0, firstDateLabel:'―' };
-  const totalMinutes = state.records.reduce((a,r)=>a+r.minutes,0);
-  const dayCount = new Set(state.records.map(r=>r.date)).size;
-  const firstDate = state.records.reduce((min,r)=> r.date<min?r.date:min, state.records[0].date);
-  const d = isoToDate(firstDate);
-  return { totalMinutes, dayCount, firstDateLabel: `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日` };
-}
-
-// Sums minutes across [startIso, endIso] inclusive for the given subjects, tolerating
-// the range being given backwards.
-function computeRangeTotal(startIso, endIso, subjectIds){
-  let a = startIso, b = endIso;
-  if(a > b){ const t=a; a=b; b=t; }
-  const dA = isoToDate(a), dB = isoToDate(b);
-  const filterSet = new Set(subjectIds);
-  let total = 0, dayCount = 0;
-  const cur = new Date(dA);
-  while(cur <= dB){
-    total += recordsOn(dateToISO(cur)).filter(r=>filterSet.has(r.subjectId)).reduce((sum,r)=>sum+r.minutes,0);
-    dayCount++;
-    cur.setDate(cur.getDate()+1);
+      </div>`;
   }
-  return { total, dayCount };
+
+  const res = rangeGroupTotals();
+  // A picked group missing from this range stays in the selection (it returns if the range changes) but isn't shown.
+  const selectedIds = ui.rangeGroupIds===null ? res.groups.map(g=>g.id) : ui.rangeGroupIds;
+  const shown = res.groups.map((g,i)=>({ ...g, color:i%BALANCE_MAX_GROUPS })).filter(g=>selectedIds.includes(g.id));
+  const total = shown.reduce((a,g)=>a+g.minutes, 0);
+  const pcts = total>0 ? roundTo100(shown.map(g=>g.minutes/total*100)) : [];
+  return `${tabs}
+      <div class="field" style="margin:14px 0 0;">
+        <label class="field-label">グループ${shown.length===res.groups.length?'':'（絞り込み中）'}</label>
+        <div class="subject-pill-grid">
+          ${res.groups.map((g,i)=>{
+            const on = selectedIds.includes(g.id);
+            return `<button type="button" class="balance-pill g${i%BALANCE_MAX_GROUPS} ${on?'on':''}" aria-pressed="${on}" data-action="toggle-range-group" data-id="${g.id}">
+              <span class="dot balance-dot g${i%BALANCE_MAX_GROUPS}"></span>${escapeHtml(g.name)}
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+      <div class="range-result">
+        ${shown.length===0
+          ? `<div class="empty" style="padding:10px 0;">グループを選んでください</div>`
+          : `<div class="v">${fmtMin(total)}</div>
+             <div class="l">${res.dayCount}日間の合計（1日平均 ${fmtMin(Math.round(total/res.dayCount))}）</div>`}
+      </div>
+      ${shown.map((g,i)=>`
+        <div class="balance-legend-row">
+          <span class="balance-dot g${g.color}"></span>
+          <span class="balance-name">${escapeHtml(g.name)}</span>
+          <span class="balance-val">${fmtMin(g.minutes)}<small>${total>0 ? `（${pcts[i]}%）` : ''}</small></span>
+        </div>`).join('')}
+      ${res.changes.length ? `<div class="balance-note">この期間の途中で、グループの設定が変わっています（${res.changes.map(shortDate).join('、')}から）。それぞれの記録は、その日の設定のグループで数えています。</div>` : ''}
+      ${res.other>0 ? `<div class="balance-note">グループ未設定の科目：${fmtMin(res.other)}（合計には含めていません）</div>` : ''}`;
 }
 
 // ---------- CALENDAR ----------
@@ -1780,6 +1818,16 @@ function onClick(e){
     const id = btn.dataset.id;
     const current = ui.rangeSubjectIds===null ? state.subjects.map(s=>s.id) : ui.rangeSubjectIds;
     ui.rangeSubjectIds = current.includes(id) ? current.filter(x=>x!==id) : [...current, id];
+    render(); return;
+  }
+  if(action==='range-mode'){
+    ui.rangeMode = btn.dataset.mode==='group' ? 'group' : 'subject';
+    render(); return;
+  }
+  if(action==='toggle-range-group' && rangeGroupsAvailable()){
+    const id = btn.dataset.id;
+    const current = ui.rangeGroupIds===null ? rangeGroupTotals().groups.map(g=>g.id) : ui.rangeGroupIds;
+    ui.rangeGroupIds = current.includes(id) ? current.filter(x=>x!==id) : [...current, id];
     render(); return;
   }
   if(action==='open-date-picker'){
