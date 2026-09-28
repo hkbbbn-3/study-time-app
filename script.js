@@ -505,35 +505,12 @@ function renderPage(){
 // state.balance = { enabled, versions:[{ from:'YYYY-MM-DD', savedOn:'YYYY-MM-DD', groups:[{id,name,subjectIds,target}] }] }
 // Each version is the setup in force from that date on, so a week or month is always judged by the settings it
 // was recorded under. The last version is the current one and the one shown in Settings.
-const BALANCE_MIN_GROUPS = 2, BALANCE_MAX_GROUPS = 4;
-const BALANCE_SINCE_START = '1970-01-01'; // "from the very beginning" marker for the first version
-
-function isValidGroups(gs){
-  return Array.isArray(gs) && gs.length>=BALANCE_MIN_GROUPS && gs.length<=BALANCE_MAX_GROUPS &&
-    gs.every(g=>g && typeof g.id==='string' && typeof g.name==='string' && Array.isArray(g.subjectIds) && typeof g.target==='number' && g.target>=0 && g.target<=100);
-}
-function isValidBalance(b){
-  return !!b && typeof b==='object' && Array.isArray(b.versions) && b.versions.length>=1 &&
-    b.versions.every(v=>v && typeof v.from==='string' && isValidGroups(v.groups));
-}
+// Validation and upgrading of this shape live in backup.js (shared with the JSON backup import).
+const { BALANCE_MIN_GROUPS, BALANCE_MAX_GROUPS, BALANCE_SINCE_START } = Backup;
+function backupOpts(){ return { makeId:uid, today:isoToday() }; }
 
 // Earlier saves used a single setup ({groups} or the first {a,b,targetA} shape): turn them into one version.
-function migrateBalance(raw){
-  if(!raw || typeof raw!=='object') return null;
-  if(isValidBalance(raw)) return raw;
-  let groups = null;
-  if(Array.isArray(raw.groups)) groups = raw.groups;
-  else if(raw.a && raw.b && typeof raw.targetA==='number'){
-    groups = [
-      { name:raw.a.name, subjectIds:raw.a.subjectIds||[], target:raw.targetA },
-      { name:raw.b.name, subjectIds:raw.b.subjectIds||[], target:100-raw.targetA },
-    ];
-  }
-  if(!groups) return null;
-  groups = groups.map(g=>({ id:g.id||uid(), name:g.name, subjectIds:g.subjectIds||[], target:g.target }));
-  const b = { enabled: raw.enabled!==false, versions:[{ from:BALANCE_SINCE_START, savedOn:isoToday(), groups }] };
-  return isValidBalance(b) ? b : null;
-}
+function migrateBalance(raw){ return Backup.migrateBalance(raw, backupOpts()); }
 
 function balanceCurrent(){ const vs = state.balance.versions; return vs[vs.length-1]; }
 // The setup that applied on a given day (days before the first version use the first one).
@@ -1895,6 +1872,9 @@ function onClick(e){
       state.subjects = result.subjects;
       state.records = result.records;
       state.goals = result.goals;
+      state.balance = result.extras.balance;
+      state.deadlines = result.extras.deadlines;
+      ui.balanceEditIdx = null; ui.balanceApplyFrom = null; ui.rangeGroupIds = null; // they pointed into the replaced setup
       if(result.theme){ state.theme = result.theme; applyTheme(); }
       persist();
       showToast(`${result.records.length}件の記録を読み込みました`);
@@ -2069,7 +2049,7 @@ function saveGoalsFromForm(){
 }
 
 function exportJson(){
-  const data = JSON.stringify({version:SCHEMA_VERSION, subjects:state.subjects, records:state.records, goals:state.goals}, null, 2);
+  const data = JSON.stringify(Backup.buildBackup(state, SCHEMA_VERSION), null, 2);
   downloadBlob(data, 'study-time-backup.json', 'application/json');
   showToast('バックアップを書き出しました');
 }
@@ -2113,10 +2093,18 @@ function handleImport(file){
         resetImportInput();
         return;
       }
+      // Backups made before the balance setup and target dates were exported don't have them: those keep the current ones.
+      result.extras = result.native
+        ? Backup.restoreExtras(parsed, { balance:state.balance, deadlines:state.deadlines }, backupOpts())
+        : { balance:state.balance, deadlines:state.deadlines, balanceFrom:'kept', deadlinesFrom:'kept' };
+      const extrasNote = [
+        result.extras.balanceFrom==='file' ? '学習バランスのグループ設定も、ファイルの内容に置き換わります。' : 'このファイルには学習バランスのグループ設定が入っていないので、今の設定をそのまま残します。',
+        result.extras.deadlinesFrom==='file' ? '目標日も、ファイルの内容に置き換わります。' : 'このファイルには目標日が入っていないので、今の目標日をそのまま残します。',
+      ].join('');
       pendingImport = result;
       openConfirm(
         'バックアップを読み込みますか？',
-        `現在のデータは上書きされます（${result.records.length}件の記録を読み込みます）。この操作は取り消せません。`,
+        `現在のデータは上書きされます（${result.records.length}件の記録を読み込みます）。${extrasNote}この操作は取り消せません。`,
         'import', null, '読み込む'
       );
     }catch(err){
@@ -2240,6 +2228,7 @@ function normalizeImportedData(parsed){
      parsed.records.every(r=>r && typeof r==='object' && 'subjectId' in r && 'minutes' in r)){
     return {
       ok:true,
+      native:true,
       subjects: parsed.subjects,
       records: parsed.records.map(r=>({ id:r.id||uid(), date:r.date, subjectId:r.subjectId, minutes:Number(r.minutes)||0, memo:r.memo||'' })),
       goals: parsed.goals && typeof parsed.goals==='object' ? { weekday:Number(parsed.goals.weekday)||120, weekend:Number(parsed.goals.weekend)||240 } : state.goals,
