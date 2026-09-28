@@ -66,7 +66,15 @@
     return { balance, deadlines, balanceFrom, deadlinesFrom };
   }
 
-  const api = { BALANCE_MIN_GROUPS, BALANCE_MAX_GROUPS, BALANCE_SINCE_START, isValidBalance, migrateBalance, buildBackup, restoreExtras };
+  // Download name with the local date and time (e.g. study-time-backup_2026-09-28_1130.json) so a new export never
+  // collides with an earlier one, and sorting by name sorts by time. kind: 'json' (backup) or 'csv'.
+  function exportFileName(date, kind){
+    const p = n=>String(n).padStart(2,'0');
+    const stamp = `${date.getFullYear()}-${p(date.getMonth()+1)}-${p(date.getDate())}_${p(date.getHours())}${p(date.getMinutes())}`;
+    return kind==='csv' ? `study-time_${stamp}.csv` : `study-time-backup_${stamp}.json`;
+  }
+
+  const api = { BALANCE_MIN_GROUPS, BALANCE_MAX_GROUPS, BALANCE_SINCE_START, isValidBalance, migrateBalance, buildBackup, restoreExtras, exportFileName };
   if(typeof module!=='undefined' && module.exports) module.exports = api;
   else root.Backup = api;
 })(this);

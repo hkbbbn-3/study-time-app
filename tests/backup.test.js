@@ -151,3 +151,19 @@ test('restored data does not share objects with the file or the current state', 
   assert.notEqual(res.balance, file.balance);
   assert.notEqual(res.deadlines, file.deadlines);
 });
+
+// ---------- exportFileName ----------
+
+const { exportFileName } = require('../backup.js');
+
+test('exportFileName: puts the local date and time in the backup name, zero-padded', () => {
+  assert.equal(exportFileName(new Date(2026, 8, 5, 7, 3, 59), 'json'), 'study-time-backup_2026-09-05_0703.json');
+});
+
+test('exportFileName: works on the last minute of the year', () => {
+  assert.equal(exportFileName(new Date(2026, 11, 31, 23, 59), 'json'), 'study-time-backup_2026-12-31_2359.json');
+});
+
+test('exportFileName: the CSV name follows the same pattern', () => {
+  assert.equal(exportFileName(new Date(2026, 8, 28, 11, 30), 'csv'), 'study-time_2026-09-28_1130.csv');
+});

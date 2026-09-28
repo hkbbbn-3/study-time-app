@@ -2050,7 +2050,7 @@ function saveGoalsFromForm(){
 
 function exportJson(){
   const data = JSON.stringify(Backup.buildBackup(state, SCHEMA_VERSION), null, 2);
-  downloadBlob(data, 'study-time-backup.json', 'application/json');
+  downloadBlob(data, Backup.exportFileName(new Date(), 'json'), 'application/json');
   showToast('バックアップを書き出しました');
 }
 
@@ -2060,7 +2060,7 @@ function exportCsv(){
     rows.push([r.date, subjectById(r.subjectId).name, r.minutes, (r.memo||'').replace(/\n/g,' ')]);
   });
   const csv = rows.map(row=>row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  downloadBlob('\uFEFF'+csv, 'study-time.csv', 'text/csv');
+  downloadBlob('\uFEFF'+csv, Backup.exportFileName(new Date(), 'csv'), 'text/csv');
   showToast('CSVを書き出しました');
 }
 
