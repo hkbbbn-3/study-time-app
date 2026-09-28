@@ -853,6 +853,13 @@ html[data-design="sea"] .sea-layers{ display:block; }
 .wbar-fill{width:100%; border-radius:var(--radius-sm); background:var(--grad-bar); transition:height .5s var(--ease);}
 .wlabel{font-size:var(--fs-caption); font-weight:700; color:var(--color-faint);}
 .wlabel.today{color:var(--color-primary);}
+/* Day-of-month chip between the bar and the weekday; the first of a month also shows the month ("10/1") */
+.wdate{min-width:28px; height:28px; padding:0 6px; border-radius:var(--radius-pill); display:flex; align-items:center; justify-content:center;
+  background:var(--color-surface-soft); border:1.5px solid var(--color-line); color:var(--color-muted);
+  font-size:var(--fs-caption); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; white-space:nowrap;
+  transition:background .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease);}
+.wdate.month-start{min-width:0; max-width:100%; padding:0 3px; font-size:10px; letter-spacing:-.04em;} /* "10/1" must fit a 28px column on 320px screens */
+.wdate.today{border-color:var(--color-primary); color:var(--color-primary);}
 .wdot{width:5px;height:5px;border-radius:50%;background:var(--color-primary); opacity:0;}
 .wdot.show{opacity:1;}
 .week-compare{margin-top:var(--sp-4); padding-top:var(--sp-4); border-top:1px solid var(--color-line);}
@@ -1326,8 +1333,10 @@ html[data-design="cute"].dark{ --bal-1:#F0A0B6; --bal-2:#8FC0E8; }
 /* Tappable week bars + the day breakdown under them */
 button.wcol{ background:transparent; border:0; padding:var(--sp-1) 0; font:inherit; color:inherit; cursor:pointer; min-width:0; border-radius:var(--radius-sm); }
 button.wcol:active{ transform:scale(.96); }
-button.wcol.selected{ background:var(--color-primary-soft); box-shadow:0 0 0 2px var(--color-primary); }
+button.wcol.selected .wdate{ background:var(--color-primary); border-color:var(--color-primary); color:var(--color-on-primary); box-shadow:0 4px 10px -4px var(--color-primary); }
 button.wcol.selected .wlabel{ color:var(--color-primary); }
+html[data-design="neon"] button.wcol.selected .wdate,
+html[data-design="violet"] button.wcol.selected .wdate{ box-shadow:0 0 12px -1px var(--color-primary); }
 .week-hint{ margin-top:var(--sp-3); text-align:center; font-size:var(--fs-caption); color:var(--color-faint); }
 .day-detail{ margin-top:var(--sp-4); padding:var(--sp-3) var(--sp-4); border-radius:var(--radius-sm); background:var(--color-surface-soft); }
 .day-detail-head{ display:flex; align-items:baseline; justify-content:space-between; gap:var(--sp-2); margin-bottom:var(--sp-2); }

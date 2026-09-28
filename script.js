@@ -791,6 +791,7 @@ function renderHome(){
     weekHtml += `
       <button type="button" class="wcol ${isSel?'selected':''}" data-action="week-select-day" data-date="${iso}" aria-pressed="${isSel}" aria-label="${d.getMonth()+1}月${d.getDate()}日（${WEEKDAY_LABELS[i]}） ${mins>0?fmtMin(mins):'記録なし'}">
         <div class="wbar-track"><div class="wbar-fill" style="height:${mins>0?h:4}%; opacity:${mins>0?1:0.35}"></div></div>
+        <div class="wdate ${isToday?'today':''} ${d.getDate()===1?'month-start':''}" aria-hidden="true">${d.getDate()===1 ? `${d.getMonth()+1}/1` : d.getDate()}</div>
         <div class="wlabel ${isToday?'today':''}">${WEEKDAY_LABELS[i]}</div>
       </button>`;
   }
