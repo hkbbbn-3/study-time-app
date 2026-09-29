@@ -1247,7 +1247,7 @@ function renderRecord(){
 
   return `
     ${renderTimerCard()}
-    <div class="card">
+    <div class="card" id="recordFormCard">
       <div class="card-title icon-row">${isEditing ? icon('edit',15)+' 記録を編集' : icon('edit',15)+' 時間を入力して記録'}</div>
       ${isEditing ? '' : `<div class="card-desc">勉強した時間を自分で入力します。終わった勉強や、過去の日の記録もOK。</div>`}
 
@@ -1586,6 +1586,7 @@ function onClick(e){
 
   if(action==='go-tab'){
     ui.tab = btn.dataset.tab;
+    ui.editReturnTab = null;
     if(ui.tab==='calendar'){ /* keep month */ }
     render();
     return;
@@ -1641,14 +1642,19 @@ function onClick(e){
   }
   if(action==='cancel-edit'){
     resetForm();
+    returnFromEdit();
     render(); return;
   }
   if(action==='edit-record'){
     const rec = state.records.find(r=>r.id===btn.dataset.id);
     if(rec){
       ui.form = { date:rec.date, subjectIds:[rec.subjectId], hours:Math.floor(rec.minutes/60), minutes:rec.minutes%60, memo:rec.memo||'', editingId:rec.id };
-      window.scrollTo(0,0);
+      // The edit form lives on the 記録 tab: go there (from the calendar too), and come back afterwards.
+      ui.editReturnTab = ui.tab!=='record' ? ui.tab : null;
+      ui.tab = 'record';
       render();
+      const card = document.getElementById('recordFormCard');
+      if(card) card.scrollIntoView({ block:'start' }); else window.scrollTo(0,0);
     }
     return;
   }
@@ -2016,6 +2022,8 @@ function submitRecord(){
     const rec = state.records.find(r=>r.id===f.editingId);
     if(rec){ rec.date=f.date; rec.subjectId=f.subjectIds[0]; rec.minutes=minutes; rec.memo=f.memo; }
     showToast('記録を更新しました');
+    if(ui.editReturnTab==='calendar') ui.selectedDate = f.date; // show the edited day
+    returnFromEdit();
   } else {
     f.subjectIds.forEach(subjectId=>{
       state.records.push({ id: uid(), date:f.date, subjectId, minutes, memo:f.memo });
@@ -2032,6 +2040,10 @@ function submitRecord(){
   }
 }
 
+// After editing a record that was opened from another tab (e.g. the calendar), go back to that tab.
+function returnFromEdit(){
+  if(ui.editReturnTab){ ui.tab = ui.editReturnTab; ui.editReturnTab = null; window.scrollTo(0,0); }
+}
 function resetForm(keepDate){
   ui.form = { date: keepDate || isoToday(), subjectIds: [], hours:1, minutes:0, memo:state.lastMemo||'', editingId:null };
 }
