@@ -70,9 +70,9 @@ let state = {
 };
 
 const DESIGNS = [
-  { id:'calm', name:'Calm Focus', desc:'落ち着いた上品なデザイン。ベージュ×セージグリーン', swatch:['#F3F0E9','#5E7857','#7A726A'] },
+  { id:'calm', name:'Calm Focus', desc:'落ち着いた上品なデザイン。ベージュ×セージグリーン', swatch:['#EFEDE7','#5E7857','#77706A'] },
   { id:'cute', name:'Soft Cute',  desc:'やわらかくてかわいい。淡いピンク×水色',           swatch:['#FBE1E7','#B85673','#D6E6F5'] },
-  { id:'neon', name:'Neon Pop',   desc:'ネオンピンク×ネオンブルー。光るポップな夜のデザイン', swatch:['#160B2E','#FF3EA5','#27D8FF'] },
+  { id:'neon', name:'Neon Pop',   desc:'夜の街のネオン管。ピンクとシアンの線が光る', swatch:['#0B1128','#FF3EA5','#3FE0FF'] },
   { id:'violet', name:'Neon Violet', desc:'ビビッドな紫×マゼンタ。絵の具が弾けるアートなネオン', swatch:['#3A10B5','#FF2FA8','#9DB2FF'] },
   { id:'sea',  name:'Deep Sea',   desc:'海から深海へ。青×シアンの世界観（ダークモード推奨）', swatch:['#0A3350','#38C6E8','#6C7CF0'] },
 ];
@@ -213,10 +213,20 @@ function applyTheme(){
   const root = document.documentElement;
   root.classList.toggle('dark', state.theme==='dark');
   root.setAttribute('data-design', state.design);
+  loadDesignFont(state.design);
   // keep the browser/PWA status bar colour in step with the page background
   const meta = document.querySelector('meta[name="theme-color"]');
   const bg = getComputedStyle(root).getPropertyValue('--color-bg').trim();
   if(meta && bg) meta.setAttribute('content', bg);
+}
+
+// Swap in the chosen design's typeface (URLs live in index.html so the first paint already has it).
+function loadDesignFont(design){
+  const href = (window.DESIGN_FONTS || {})[design];
+  let link = document.getElementById('design-font');
+  if(!href){ if(link) link.remove(); return; }
+  if(!link){ link = document.createElement('link'); link.rel='stylesheet'; link.id='design-font'; document.head.appendChild(link); }
+  if(link.getAttribute('href')!==href) link.setAttribute('href', href);
 }
 
 // ---------- toast ----------
@@ -269,14 +279,6 @@ function render(){
   const tabIndex = TAB_ORDER.indexOf(ui.tab);
   root.innerHTML = `
     <div class="mesh"><span></span><span></span><span></span></div>
-    <!-- Deep Sea backdrop (visible only when data-design="sea"). Mounting points for future
-         scroll-depth effects: drive --depth (0..1) on <html>, animate .sea-particles, and drop
-         fish / jellyfish into .sea-slot elements. -->
-    <div class="sea-layers" aria-hidden="true">
-      <div class="sea-gradient"></div>
-      <div class="sea-light"></div>
-      <div class="sea-particles"></div>
-    </div>
     <div class="phone">
       <div class="topbar">
         <div class="brand">
@@ -289,13 +291,13 @@ function render(){
         <div class="iconbtn" data-action="toggle-theme" role="button" tabindex="0" aria-label="${state.theme==='dark' ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}">${state.theme==='dark' ? icon('sun',17) : icon('moon',17)}</div>
       </div>
       <div class="content fade-in" id="content"></div>
-      <div class="tabbar">
+      <nav class="tabbar" aria-label="メインメニュー">
         <div class="tab-indicator" style="transform:translateX(${tabIndex*100}%)"></div>
-        ${tabBtn('home', icon('home',19), 'ホーム')}
-        ${tabBtn('calendar', icon('calendar',19), 'カレンダー')}
-        ${tabBtn('record', icon('clock',19), '記録', state.timer && state.timer.running)}
-        ${tabBtn('settings', icon('sliders',19), '設定')}
-      </div>
+        ${tabBtn('home', icon('home',22), 'ホーム')}
+        ${tabBtn('calendar', icon('calendar',22), 'カレンダー')}
+        ${tabBtn('record', icon('clock',22), '記録', state.timer && state.timer.running)}
+        ${tabBtn('settings', icon('sliders',22), '設定')}
+      </nav>
     </div>
     ${ui.confirm ? renderConfirmModal() : ''}
     ${ui.subjectEditor ? renderSubjectEditor() : ''}
@@ -489,7 +491,7 @@ function openConfirm(title, desc, actionType, actionId, confirmLabel){
 }
 
 function tabBtn(key,icon,label,showDot){
-  return `<button data-action="go-tab" data-tab="${key}" class="${ui.tab===key?'active':''}">${icon}${showDot?'<span class="tab-dot" aria-hidden="true"></span>':''}<span>${label}</span></button>`;
+  return `<button data-action="go-tab" data-tab="${key}" class="${ui.tab===key?'active':''}" ${ui.tab===key?'aria-current="page"':''}>${icon}${showDot?'<span class="tab-dot" aria-hidden="true"></span>':''}<span>${label}</span></button>`;
 }
 
 function renderPage(){
@@ -740,7 +742,7 @@ function renderDeadlineHome(){
   if(upcoming.length===0) return '';
   return `
     <div class="section-label icon-row" style="justify-content:flex-start">${icon('calendar',13)} 目標日</div>
-    <div class="card deadline-home-card">
+    <div class="card card--primary deadline-home-card">
       ${upcoming.map(d=>{
         const days = daysUntil(d.date);
         return `
@@ -862,17 +864,14 @@ function renderHome(){
     <div class="hero ${achieved ? 'hero-achieved' : ''}">
       ${achieved ? `<div class="confetti" id="confetti"></div>` : ''}
       <div class="hero-top">
-        <div>
-          <div class="hero-date">${dateStr}</div>
-          <div class="hero-greet">${achieved ? `<span class="icon-row">${icon('check',15)} 今日の目標達成！</span>` : '今日もコツコツいこう'}</div>
-        </div>
-        <div class="streak-chip">${icon('flame',13)} ${streak}日</div>
+        <div class="hero-date">${dateStr}</div>
+        <div class="hero-greet">${achieved ? `<span class="icon-row">${icon('check',15)} 今日の目標達成！</span>` : '今日もコツコツいこう'}</div>
       </div>
       <div class="hero-main">
         <div class="hero-time">
           <div class="hero-label">今日の学習時間</div>
           <div class="hero-display">${fmtMinHtml(minutes)}</div>
-          <div class="hero-goal">${achieved ? '目標達成！おつかれさま' : (goal>0 ? `目標まであと ${fmtMin(goal-minutes)}` : '設定タブで目標を決めよう')}</div>
+          <div class="hero-goal">${achieved ? `目標 <b>${fmtMin(goal)}</b> をクリア。おつかれさま` : (goal>0 ? `<span class="nw">目標 <b>${fmtMin(goal)}</b> まで、</span><span class="nw">あと ${fmtMin(goal-minutes)}</span>` : '設定タブで目標を決めよう')}</div>
         </div>
         <div class="ring-wrap" role="img" aria-label="今日の目標達成率 ${pct}%">
           <svg viewBox="0 0 110 110" aria-hidden="true">
@@ -888,18 +887,15 @@ function renderHome(){
         </div>
       </div>
       <div class="hero-foot">
-        <div><div class="val">${fmtMin(heroWeekTotal)}</div><div class="lab">今週</div></div>
-        <div><div class="val">${goal>0?fmtMin(goal):'未設定'}</div><div class="lab">今日の目標</div></div>
+        <div><div class="val">${fmtMin(heroWeekTotal)}</div><div class="lab">今週の合計</div></div>
+        <div><div class="val">${icon('flame',16)} ${streak}日</div><div class="lab">連続で目標達成</div></div>
       </div>
     </div>
 
     ${renderDeadlineHome()}
 
-    <div class="section-label">バランス</div>
-    ${renderBalanceHome()}
-
     <div class="section-label">今週</div>
-    <div class="card">
+    <div class="card card--primary">
       <div class="cal-head" style="margin-bottom:var(--sp-3);">
         <div class="cal-title">${weekTitle}</div>
         <div class="cal-nav">
@@ -957,9 +953,11 @@ function renderHome(){
       </div>
     </div>
 
-    <div class="section-label">その他の統計</div>
-    <div class="card card--compact">
-      <div class="card-title icon-row">${icon('trending',15)} これまでの記録</div>
+    <div class="section-label">バランス</div>
+    ${renderBalanceHome()}
+
+    <div class="section-label is-quiet">これまでの記録</div>
+    <div class="card card--quiet">
       <div class="alltime-stats">
         <div class="alltime-stat">
           <div class="v">${fmtMin(allTime.totalMinutes)}</div>
@@ -974,20 +972,19 @@ function renderHome(){
           <div class="l">はじめた日</div>
         </div>
       </div>
-    </div>
-
-    <div class="level-card">
-      <div class="level-badge">Lv.${computeLevel().level}</div>
-      <div class="level-mid">
-        <div class="level-top">
-          <span class="level-name">きょうも育成中</span>
-          <span class="level-remain">次のLvまで ${fmtMin(computeLevel().remain)}</span>
+      <div class="level-card">
+        <div class="level-badge">Lv.${computeLevel().level}</div>
+        <div class="level-mid">
+          <div class="level-top">
+            <span class="level-name">きょうも育成中</span>
+            <span class="level-remain">次のLvまで ${fmtMin(computeLevel().remain)}</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill level-fill" style="width:${computeLevel().pct}%"></div></div>
         </div>
-        <div class="bar-track"><div class="bar-fill level-fill" style="width:${computeLevel().pct}%"></div></div>
       </div>
     </div>
 
-    <div class="card">
+    <div class="card card--quiet">
       <div class="card-title icon-row">${icon('calendar',15)} 期間で合計を調べる</div>
       <div class="range-row">
         <div class="date-field icon-row" data-action="open-date-picker" data-target="rangeStart" role="button" tabindex="0">
@@ -2374,9 +2371,30 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
   });
 }
 
+// ---------- Deep Sea backdrop ----------
+// Built once, directly on <body>, OUTSIDE #canvas: render() replaces #canvas's whole innerHTML on
+// every state change, so anything animated or loaded (a diver sprite, bubbles) must not live there.
+// Layers, back to front — each is an empty mounting point until its effect is added:
+//   .sea-gradient   the water column (surface -> shallows -> mid -> deep -> trench); scroll moves it
+//   .sea-light      light entering from the surface; fades out as you go deeper
+//   .sea-particles  bubbles / marine snow
+//   .sea-life       fish, jellyfish (.sea-slot children)
+//   .sea-diver      the diver
+// Depth is driven purely by CSS (animation-timeline: scroll()), with no scroll listeners — see style.css.
+function ensureSeaLayers(){
+  if(document.getElementById('seaLayers')) return;
+  const el = document.createElement('div');
+  el.id = 'seaLayers';
+  el.className = 'sea-layers';
+  el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = '<div class="sea-gradient"></div><div class="sea-light"></div><div class="sea-particles"></div><div class="sea-life"></div><div class="sea-diver"></div>';
+  document.body.insertBefore(el, document.body.firstChild);
+}
+
 // ---------- init ----------
 (async function init(){
   await loadData();
+  ensureSeaLayers();
   render();
   setInterval(tickTimerDisplay, 1000);
 })();

@@ -6,16 +6,28 @@
 <title>Study Time</title>
 <script>
 // Apply the saved design + light/dark before first paint so the page doesn't flash the default look.
+window.DESIGN_FONTS = {
+  calm:'https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap',
+  neon:'https://fonts.googleapis.com/css2?family=M+PLUS+1:wght@200;300;500;700&display=swap',
+  violet:'https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap'
+};
 (function(){
+  var design = 'calm';
   try{
     var d = JSON.parse(localStorage.getItem('study-app-data') || '{}');
-    var design = (d.design==='cute' || d.design==='neon' || d.design==='violet' || d.design==='sea' || d.design==='calm') ? d.design : 'calm';
+    design = (d.design==='cute' || d.design==='neon' || d.design==='violet' || d.design==='sea' || d.design==='calm') ? d.design : 'calm';
     document.documentElement.setAttribute('data-design', design);
     if(d.theme==='dark') document.documentElement.classList.add('dark');
-  }catch(e){ document.documentElement.setAttribute('data-design','calm'); }
+  }catch(e){ design = 'calm'; document.documentElement.setAttribute('data-design','calm'); }
+  // Each design's own typeface is fetched only when that design is in use (script.js swaps it on change).
+  // Offline or blocked, the design simply falls back to the Zen fonts loaded by style.css.
+  var href = window.DESIGN_FONTS[design];
+  if(href){ var l=document.createElement('link'); l.rel='stylesheet'; l.id='design-font'; l.href=href; document.head.appendChild(l); }
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=24">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="style.css?v=25">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
