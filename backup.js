@@ -7,6 +7,23 @@
 
   function clone(v){ return JSON.parse(JSON.stringify(v)); }
 
+  // Check the calendar itself, not Date's rollover (e.g. February 31 -> March 3).
+  function isValidISODate(value){
+    if(typeof value!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const [year, month, day] = value.split('-').map(Number);
+    if(year<1 || month<1 || month>12 || day<1) return false;
+    const leap = year%4===0 && (year%100!==0 || year%400===0);
+    const monthDays = [31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+    return day<=monthDays[month-1];
+  }
+
+  function goalMinutes(value, fallback){
+    if((typeof value!=='number' && typeof value!=='string') ||
+       (typeof value==='string' && value.trim()==='')) return fallback;
+    const minutes = Number(value);
+    return Number.isFinite(minutes) && minutes>=0 ? minutes : fallback;
+  }
+
   function isValidGroups(gs){
     return Array.isArray(gs) && gs.length>=BALANCE_MIN_GROUPS && gs.length<=BALANCE_MAX_GROUPS &&
       gs.every(g=>g && typeof g.id==='string' && typeof g.name==='string' && Array.isArray(g.subjectIds) && typeof g.target==='number' && g.target>=0 && g.target<=100);
@@ -43,7 +60,7 @@
 
   function isValidDeadline(d){
     return !!d && typeof d==='object' && typeof d.label==='string' && d.label.trim()!=='' &&
-      typeof d.date==='string' && /^\d{4}-\d{2}-\d{2}$/.test(d.date);
+      isValidISODate(d.date);
   }
 
   // The balance setup and target dates to use after importing `file`. Backups made before these were exported have
@@ -74,7 +91,7 @@
     return kind==='csv' ? `study-time_${stamp}.csv` : `study-time-backup_${stamp}.json`;
   }
 
-  const api = { BALANCE_MIN_GROUPS, BALANCE_MAX_GROUPS, BALANCE_SINCE_START, isValidBalance, migrateBalance, buildBackup, restoreExtras, exportFileName };
+  const api = { BALANCE_MIN_GROUPS, BALANCE_MAX_GROUPS, BALANCE_SINCE_START, isValidISODate, goalMinutes, isValidBalance, migrateBalance, buildBackup, restoreExtras, exportFileName };
   if(typeof module!=='undefined' && module.exports) module.exports = api;
   else root.Backup = api;
 })(this);

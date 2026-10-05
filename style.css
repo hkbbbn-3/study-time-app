@@ -694,7 +694,9 @@ button{color:inherit;}
   align-items:flex-start;
   justify-content:center;
   padding:var(--sp-6) var(--sp-4) var(--sp-8);
-  overflow:hidden;
+  /* Clip decorative overflow without making a hidden scroll container.
+     Otherwise scrollIntoView() can move this canvas independently of the page. */
+  overflow:clip;
   transition:background .4s ease;
 }
 .mesh{

@@ -305,6 +305,9 @@ function render(){
     ${ui.datePicker ? renderDatePicker() : ''}
   `;
   document.getElementById('content').innerHTML = renderPage();
+  // Clear an internal offset retained from an earlier scrollIntoView/focus.
+  // Normal page scrolling belongs to the document, never to this canvas.
+  root.scrollTop = 0;
   bindEvents();
   focusModal();
 }
@@ -2098,7 +2101,7 @@ function handleImport(file){
       const parsed = JSON.parse(e.target.result);
       const result = normalizeImportedData(parsed);
       if(!result.ok){
-        showToast('この形式は読み込めませんでした');
+        showToast(result.error || 'この形式は読み込めませんでした');
         console.warn('import failed, raw data:', parsed);
         resetImportInput();
         return;
@@ -2191,6 +2194,12 @@ function handleCsvImport(file){
       for(let i=1; i<rows.length; i++){
         const r = rows[i];
         const date = normalizeDate(r[dateIdx]);
+        if(!date){
+          pendingCsvImport = null;
+          showToast(`CSVの${i+1}行目の日付が不正です。読み込みを中止しました`);
+          resetCsvImportInput();
+          return;
+        }
         const minutes = Number(r[minutesIdx]);
         const subjName = (r[subjectIdx]||'').trim();
         if(!date || !minutes || minutes<=0 || !subjName) continue;
@@ -2232,16 +2241,37 @@ function handleCsvImport(file){
 function normalizeImportedData(parsed){
   if(!parsed || typeof parsed !== 'object') return {ok:false};
 
+  const invalidDate = field=>({ok:false, error:`${field}の日付が不正です。読み込みを中止しました`});
+  // Reject the whole file before confirmation; never silently drop or roll over dates.
+  if(Array.isArray(parsed.deadlines) && parsed.deadlines.some(d=>d && d.date!==undefined && !Backup.isValidISODate(d.date))){
+    return invalidDate('目標日');
+  }
+  if(parsed.balance && Array.isArray(parsed.balance.versions) && parsed.balance.versions.some(v=>v &&
+     (!Backup.isValidISODate(v.from) || (v.savedOn!==undefined && !Backup.isValidISODate(v.savedOn))))){
+    return invalidDate('学習バランスの履歴');
+  }
+  const dateRecords = parsed.records || parsed.logs || parsed.entries || parsed.sessions || parsed.data;
+  if(Array.isArray(dateRecords)){
+    for(const r of dateRecords){
+      if(!r || typeof r!=='object') continue;
+      const raw = r.date || r.day || r.recordedAt || r.createdAt || r.timestamp;
+      // A time-only date in old exports can still fall back to recordedAt below,
+      // but an explicitly supplied impossible calendar date must not be hidden.
+      if(typeof raw==='string' && /^(?:\d{4}[-\/]\d|\d{1,2}\/\d{1,2}\/\d{4})/.test(raw) && !normalizeDate(raw)) return invalidDate('記録');
+    }
+  }
+
   // --- native shape: {subjects:[{id,name,color}], records:[{id,date,subjectId,minutes,memo}], goals:{weekday,weekend}} ---
   if(Array.isArray(parsed.subjects) && Array.isArray(parsed.records) &&
      parsed.subjects.every(s=>s && typeof s==='object' && 'id' in s) &&
      parsed.records.every(r=>r && typeof r==='object' && 'subjectId' in r && 'minutes' in r)){
+    if(parsed.records.some(r=>!Backup.isValidISODate(r.date))) return invalidDate('記録');
     return {
       ok:true,
       native:true,
       subjects: parsed.subjects,
       records: parsed.records.map(r=>({ id:r.id||uid(), date:r.date, subjectId:r.subjectId, minutes:Number(r.minutes)||0, memo:r.memo||'' })),
-      goals: parsed.goals && typeof parsed.goals==='object' ? { weekday:Number(parsed.goals.weekday)||120, weekend:Number(parsed.goals.weekend)||240 } : state.goals,
+      goals: parsed.goals && typeof parsed.goals==='object' ? { weekday:Backup.goalMinutes(parsed.goals.weekday,120), weekend:Backup.goalMinutes(parsed.goals.weekend,240) } : state.goals,
       theme: typeof parsed.darkMode === 'boolean' ? (parsed.darkMode ? 'dark' : 'light') : undefined,
     };
   }
@@ -2262,8 +2292,8 @@ function normalizeImportedData(parsed){
     const records = [];
     for(const r of parsed.records){
       let date = normalizeDate(r.date);
-      if(!date) date = normalizeDate(r.recordedAt);
-      if(!date) continue;
+      if(!date && (r.date==null || (typeof r.date==='string' && /^\d{1,2}:\d{2}(?::\d{2})?$/.test(r.date)))) date = normalizeDate(r.recordedAt);
+      if(!date) return invalidDate('記録');
 
       if(!nameToId[r.subject]){
         const id = uid();
@@ -2278,8 +2308,8 @@ function normalizeImportedData(parsed){
 
     const g = parsed.goals || {};
     const goals = {
-      weekday: g.weekdayHours!=null ? Math.round(Number(g.weekdayHours)*60) : state.goals.weekday,
-      weekend: g.weekendHours!=null ? Math.round(Number(g.weekendHours)*60) : state.goals.weekend,
+      weekday: Math.round(Backup.goalMinutes(g.weekdayHours,state.goals.weekday/60)*60),
+      weekend: Math.round(Backup.goalMinutes(g.weekendHours,state.goals.weekend/60)*60),
     };
 
     return {
@@ -2311,7 +2341,7 @@ function normalizeImportedData(parsed){
     if(!r || typeof r!=='object') continue;
     const dateRaw = r.date || r.day || r.recordedAt || r.createdAt || r.timestamp;
     const date = normalizeDate(dateRaw);
-    if(!date) continue;
+    if(!date) return invalidDate('記録');
 
     const subjName = r.subject || r.category || r.course || r.title;
     let subjectId = r.subjectId;
@@ -2340,8 +2370,8 @@ function normalizeImportedData(parsed){
 
   const g = parsed.goals || parsed.target || {};
   const goals = {
-    weekday: Number(g.weekday || g.weekdayMinutes || g.平日) || state.goals.weekday,
-    weekend: Number(g.weekend || g.weekendMinutes || g.土日) || state.goals.weekend,
+    weekday: Backup.goalMinutes(g.weekday ?? g.weekdayMinutes ?? g.平日,state.goals.weekday),
+    weekend: Backup.goalMinutes(g.weekend ?? g.weekendMinutes ?? g.土日,state.goals.weekend),
   };
 
   return {ok:true, subjects, records, goals};
@@ -2350,11 +2380,24 @@ function normalizeImportedData(parsed){
 function normalizeDate(raw){
   if(!raw) return null;
   if(typeof raw === 'string'){
-    const m = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-    if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+    const m = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?=$|T|\s)/);
+    if(m){
+      const iso = `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      return Backup.isValidISODate(iso) ? iso : null;
+    }
+    const us = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(us){
+      const iso = `${us[3]}-${us[1].padStart(2,'0')}-${us[2].padStart(2,'0')}`;
+      return Backup.isValidISODate(iso) ? iso : null;
+    }
+    // Never let Date parse arbitrary strings: it silently repairs impossible dates.
+    return null;
   }
   const d = new Date(raw);
-  if(!isNaN(d.getTime())) return dateToISO(d);
+  if(!isNaN(d.getTime())){
+    const iso = dateToISO(d);
+    return Backup.isValidISODate(iso) ? iso : null;
+  }
   return null;
 }
 
