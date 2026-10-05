@@ -1249,7 +1249,6 @@ function renderRecord(){
   const minOptions = Array.from({length:60}, (_,i)=>i);
 
   return `
-    ${renderTimerCard()}
     <div class="card" id="recordFormCard">
       <div class="card-title icon-row">${isEditing ? icon('edit',15)+' 記録を編集' : icon('edit',15)+' 時間を入力して記録'}</div>
       ${isEditing ? '' : `<div class="card-desc">勉強した時間を自分で入力します。終わった勉強や、過去の日の記録もOK。</div>`}
@@ -1304,6 +1303,8 @@ function renderRecord(){
       ${f.subjectIds.length===0 ? `<div class="submit-hint">↑ 科目を選んでください</div>` : ''}
       ${isEditing ? `<div class="cancel-link" data-action="cancel-edit">編集をやめる</div>` : ''}
     </div>
+
+    ${renderTimerCard()}
 
     <div class="section-label">${formatDateJp(f.date)}の記録</div>
     ${dayRecs.length ? dayRecs.map(r=>recordItemHtml(r)).join('') : `<div class="card"><div class="empty">まだ記録がありません</div></div>`}
