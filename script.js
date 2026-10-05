@@ -815,7 +815,7 @@ function renderHome(){
           <div class="day-detail-title">${dd.getMonth()+1}月${dd.getDate()}日（${WEEKDAY_LABELS[(dd.getDay()+6)%7]}）</div>
           <div class="day-detail-total">${dayTotal>0 ? fmtMin(dayTotal) : '記録なし'}${dayGoal>0 && dayTotal>0 ? `<small>（目標の ${Math.round(dayTotal/dayGoal*100)}%）</small>` : ''}</div>
         </div>
-        ${entries.map(([sid,min])=>{ const sj = subjectById(sid); return `<div class="subj-row"><div class="subj-dot" style="background:${sj.color}"></div><div class="subj-name">${escapeHtml(sj.name)}</div><div class="subj-min">${fmtMin(min)}</div></div>`; }).join('')}
+        ${entries.map(([sid,min])=>{ const sj = subjectById(sid); return `<div class="subj-row"><div class="subj-dot" style="background:${safeColor(sj.color)}"></div><div class="subj-name">${escapeHtml(sj.name)}</div><div class="subj-min">${fmtMin(min)}</div></div>`; }).join('')}
         <button type="button" class="week-back" style="margin:var(--sp-2) 0 0" data-action="goto-record-day" data-date="${ui.weekDay}">この日の記録を追加・編集する</button>
       </div>`;
   }
@@ -947,11 +947,11 @@ function renderHome(){
           const s = subjectById(sid);
           const w = Math.round((min/maxSubj)*100);
           return `<div class="subj-row">
-            <div class="subj-dot" style="background:${s.color}"></div>
+            <div class="subj-dot" style="background:${safeColor(s.color)}"></div>
             <div class="subj-name">${escapeHtml(s.name)}</div>
             <div class="subj-min">${fmtMin(min)}</div>
           </div>
-          <div class="bar-track" style="height:6px; margin-bottom:2px;"><div class="bar-fill" style="width:${w}%; background:${s.color}"></div></div>`;
+          <div class="bar-track" style="height:6px; margin-bottom:2px;"><div class="bar-fill" style="width:${w}%; background:${safeColor(s.color)}"></div></div>`;
         }).join('') : `<div class="empty">まだ記録がありません<br>「記録」タブから始めてみよう</div>`}
       </div>
     </div>
@@ -1041,8 +1041,8 @@ function renderRangeBody(){
         <div class="subject-pill-grid">
           ${state.subjects.map(s=>{
             const selected = rangeSubjectIds.includes(s.id);
-            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-range-subject" data-id="${s.id}" style="--pc:${s.color};${selected?`background:${s.color};border-color:${s.color};`:''}">
-              <span class="dot" style="background:${selected?'#fff':s.color}"></span>${escapeHtml(s.name)}
+            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-range-subject" data-id="${escapeHtml(s.id)}" style="--pc:${safeColor(s.color)};${selected?`background:${safeColor(s.color)};border-color:${safeColor(s.color)};`:''}">
+              <span class="dot" style="background:${selected?'#fff':safeColor(s.color)}"></span>${escapeHtml(s.name)}
             </button>`;
           }).join('')}
         </div>
@@ -1067,7 +1067,7 @@ function renderRangeBody(){
         <div class="subject-pill-grid">
           ${res.groups.map((g,i)=>{
             const on = selectedIds.includes(g.id);
-            return `<button type="button" class="balance-pill g${i%BALANCE_MAX_GROUPS} ${on?'on':''}" aria-pressed="${on}" data-action="toggle-range-group" data-id="${g.id}">
+            return `<button type="button" class="balance-pill g${i%BALANCE_MAX_GROUPS} ${on?'on':''}" aria-pressed="${on}" data-action="toggle-range-group" data-id="${escapeHtml(g.id)}">
               <span class="dot balance-dot g${i%BALANCE_MAX_GROUPS}"></span>${escapeHtml(g.name)}
             </button>`;
           }).join('')}
@@ -1117,7 +1117,7 @@ function renderCalendar(){
       <div class="day-cell ${isToday?'today':''} ${isSel?'selected':''}" data-action="select-day" data-date="${iso}" role="button" tabindex="0" aria-label="${formatDateFull(iso)}${achieved?'・目標達成':''}">
         ${achieved?`<div class="day-check">${icon('check',9)}</div>`:''}
         <div class="day-num">${dayNum}</div>
-        <div class="day-dots">${uniqueSubs.map(sid=>`<span style="background:${subjectById(sid).color}"></span>`).join('')}</div>
+        <div class="day-dots">${uniqueSubs.map(sid=>`<span style="background:${safeColor(subjectById(sid).color)}"></span>`).join('')}</div>
       </div>`;
   }
 
@@ -1154,15 +1154,15 @@ function recordItemHtml(r){
   const s = subjectById(r.subjectId);
   return `
     <div class="record-item">
-      <div class="rec-badge" style="--pc:${s.color};background:${s.color}"></div>
+      <div class="rec-badge" style="--pc:${safeColor(s.color)};background:${safeColor(s.color)}"></div>
       <div class="rec-body">
         <div class="rec-subject">${escapeHtml(s.name)}</div>
         ${r.memo ? `<div class="rec-memo">${escapeHtml(r.memo)}</div>` : ''}
       </div>
       <div class="rec-time">${fmtMin(r.minutes)}</div>
       <div class="rec-actions">
-        <button data-action="edit-record" data-id="${r.id}" aria-label="記録を編集">${icon('edit',13)}</button>
-        <button data-action="delete-record" data-id="${r.id}" aria-label="記録を削除">${icon('trash',13)}</button>
+        <button data-action="edit-record" data-id="${escapeHtml(r.id)}" aria-label="記録を編集">${icon('edit',13)}</button>
+        <button data-action="delete-record" data-id="${escapeHtml(r.id)}" aria-label="記録を削除">${icon('trash',13)}</button>
       </div>
     </div>
   `;
@@ -1199,8 +1199,8 @@ function renderTimerCard(){
         <div class="subject-pill-grid">
           ${state.subjects.map(s=>{
             const selected = ui.timerSubjectIds.includes(s.id);
-            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-timer-subject" data-id="${s.id}" style="--pc:${s.color};${selected?`background:${s.color};border-color:${s.color};`:''}">
-              <span class="dot" style="background:${selected?'#fff':s.color}"></span>${escapeHtml(s.name)}
+            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-timer-subject" data-id="${escapeHtml(s.id)}" style="--pc:${safeColor(s.color)};${selected?`background:${safeColor(s.color)};border-color:${safeColor(s.color)};`:''}">
+              <span class="dot" style="background:${selected?'#fff':safeColor(s.color)}"></span>${escapeHtml(s.name)}
             </button>`;
           }).join('')}
         </div>
@@ -1214,7 +1214,7 @@ function renderTimerCard(){
     return `
     <div class="card timer-card">
       <div class="card-title icon-row">${icon('check',15)} 記録を確認</div>
-      <div class="timer-subjects">${t.subjectIds.map(id=>{ const s=subjectById(id); return `<span class="subject-pill" style="--pc:${s.color};background:${s.color};border-color:${s.color};"><span class="dot" style="background:#fff"></span>${escapeHtml(s.name)}</span>`; }).join('')}</div>
+      <div class="timer-subjects">${t.subjectIds.map(id=>{ const s=subjectById(id); return `<span class="subject-pill" style="--pc:${safeColor(s.color)};background:${safeColor(s.color)};border-color:${safeColor(s.color)};"><span class="dot" style="background:#fff"></span>${escapeHtml(s.name)}</span>`; }).join('')}</div>
       <div class="timer-display timer-display--done">${fmtMin(t.finalMinutes)}</div>
       <div class="field" style="margin-top:var(--sp-4);">
         <label class="field-label">メモ（任意）</label>
@@ -1228,7 +1228,7 @@ function renderTimerCard(){
   return `
     <div class="card timer-card">
       <div class="card-title icon-row">${icon('clock',15)} ${t.running ? '計測中' : '一時停止中'}</div>
-      <div class="timer-subjects">${t.subjectIds.map(id=>{ const s=subjectById(id); return `<span class="subject-pill" style="--pc:${s.color};background:${s.color};border-color:${s.color};"><span class="dot" style="background:#fff"></span>${escapeHtml(s.name)}</span>`; }).join('')}</div>
+      <div class="timer-subjects">${t.subjectIds.map(id=>{ const s=subjectById(id); return `<span class="subject-pill" style="--pc:${safeColor(s.color)};background:${safeColor(s.color)};border-color:${safeColor(s.color)};"><span class="dot" style="background:#fff"></span>${escapeHtml(s.name)}</span>`; }).join('')}</div>
       <div class="timer-display" id="timerDisplay">${fmtElapsed(timerElapsedMs())}</div>
       <div class="timer-actions">
         ${t.running
@@ -1246,7 +1246,7 @@ function renderRecord(){
   const isEditing = !!f.editingId;
   const dayRecs = recordsOn(f.date);
   const hourOptions = Array.from({length:13}, (_,i)=>i);
-  const minOptions = [0,10,20,30,40,50];
+  const minOptions = Array.from({length:60}, (_,i)=>i);
 
   return `
     ${renderTimerCard()}
@@ -1267,8 +1267,8 @@ function renderRecord(){
         <div class="subject-pill-grid">
           ${state.subjects.map(s=>{
             const selected = f.subjectIds.includes(s.id);
-            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-subject-select" data-id="${s.id}" style="--pc:${s.color};${selected?`background:${s.color};border-color:${s.color};`:''}">
-              <span class="dot" style="background:${selected?'#fff':s.color}"></span>${escapeHtml(s.name)}
+            return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-subject-select" data-id="${escapeHtml(s.id)}" style="--pc:${safeColor(s.color)};${selected?`background:${safeColor(s.color)};border-color:${safeColor(s.color)};`:''}">
+              <span class="dot" style="background:${selected?'#fff':safeColor(s.color)}"></span>${escapeHtml(s.name)}
             </button>`;
           }).join('')}
         </div>
@@ -1376,8 +1376,8 @@ function renderSettings(){
             <div class="name">${escapeHtml(d.label)}</div>
             <div class="deadline-date">${formatDateFull(d.date)}・${status}</div>
           </div>
-          <button data-action="edit-deadline" data-id="${d.id}" aria-label="「${escapeHtml(d.label)}」を編集">${icon('edit',13)}</button>
-          <button data-action="delete-deadline" data-id="${d.id}" aria-label="「${escapeHtml(d.label)}」を削除">${icon('x',13)}</button>
+          <button data-action="edit-deadline" data-id="${escapeHtml(d.id)}" aria-label="「${escapeHtml(d.label)}」を編集">${icon('edit',13)}</button>
+          <button data-action="delete-deadline" data-id="${escapeHtml(d.id)}" aria-label="「${escapeHtml(d.label)}」を削除">${icon('x',13)}</button>
         </div>`;
       }).join('')}
       ${state.deadlines.length===0 ? `<div class="empty" style="padding:6px 0 14px;">試験日などの目標を設定すると、ホームにカウントダウンが出ます</div>` : ''}
@@ -1388,14 +1388,14 @@ function renderSettings(){
     <div class="card">
       ${state.subjects.map((s,idx)=>`
         <div class="subject-chip">
-          <div class="dot" style="background:${s.color}"></div>
+          <div class="dot" style="background:${safeColor(s.color)}"></div>
           <div class="name">${escapeHtml(s.name)}</div>
           <div class="reorder-btns">
-            <button data-action="move-subject-up" data-id="${s.id}" aria-label="「${escapeHtml(s.name)}」を上に移動" ${idx===0?'disabled':''}>${icon('arrowUp',12)}</button>
-            <button data-action="move-subject-down" data-id="${s.id}" aria-label="「${escapeHtml(s.name)}」を下に移動" ${idx===state.subjects.length-1?'disabled':''}>${icon('arrowDown',12)}</button>
+            <button data-action="move-subject-up" data-id="${escapeHtml(s.id)}" aria-label="「${escapeHtml(s.name)}」を上に移動" ${idx===0?'disabled':''}>${icon('arrowUp',12)}</button>
+            <button data-action="move-subject-down" data-id="${escapeHtml(s.id)}" aria-label="「${escapeHtml(s.name)}」を下に移動" ${idx===state.subjects.length-1?'disabled':''}>${icon('arrowDown',12)}</button>
           </div>
-          <button data-action="edit-subject" data-id="${s.id}" aria-label="「${escapeHtml(s.name)}」を編集">${icon('edit',13)}</button>
-          <button data-action="delete-subject" data-id="${s.id}" aria-label="「${escapeHtml(s.name)}」を削除">${icon('x',13)}</button>
+          <button data-action="edit-subject" data-id="${escapeHtml(s.id)}" aria-label="「${escapeHtml(s.name)}」を編集">${icon('edit',13)}</button>
+          <button data-action="delete-subject" data-id="${escapeHtml(s.id)}" aria-label="「${escapeHtml(s.name)}」を削除">${icon('x',13)}</button>
         </div>
       `).join('')}
       <div class="add-subject-row">
@@ -1475,8 +1475,8 @@ function renderBalanceSettings(){
         <div class="subject-pill-grid">
           ${state.subjects.map(s=>{
             const on = g.subjectIds.includes(s.id);
-            return `<button type="button" class="balance-pill g${i} ${on?'on':''}" aria-pressed="${on}" data-action="balance-toggle-subject" data-index="${i}" data-id="${s.id}">
-              <span class="dot" style="background:${s.color}"></span>${escapeHtml(s.name)}
+            return `<button type="button" class="balance-pill g${i} ${on?'on':''}" aria-pressed="${on}" data-action="balance-toggle-subject" data-index="${i}" data-id="${escapeHtml(s.id)}">
+              <span class="dot" style="background:${safeColor(s.color)}"></span>${escapeHtml(s.name)}
             </button>`;
           }).join('')}
         </div>
@@ -1523,6 +1523,12 @@ function escapeHtml(str){
   return String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// Imported and already saved colors must remain a color, never CSS or markup.
+// Keep stored data untouched; unsupported colors display with a neutral fallback.
+function safeColor(value){
+  return typeof value==='string' && /^#(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/i.test(value) ? value : '#999';
+}
+
 // ---------- events ----------
 function bindEvents(){
   const root = document.getElementById('canvas');
@@ -1530,6 +1536,7 @@ function bindEvents(){
 
   root.addEventListener('click', onClick);
   root.addEventListener('change', onChange);
+  root.addEventListener('input', onInput);
   root.addEventListener('keydown', onKeydown);
 }
 
@@ -1981,6 +1988,14 @@ function onClick(e){
   if(action==='trigger-csv-import'){ document.getElementById('import-csv-file').click(); return; }
 }
 
+function onInput(e){
+  if(e.target.dataset.field==='deadline-edit-label' && ui.deadlineEditor){
+    ui.deadlineEditor.label = e.target.value;
+    const btn = document.querySelector('[data-action="save-deadline-edit"]');
+    if(btn) btn.disabled = e.target.value.trim()==='';
+  }
+}
+
 function onChange(e){
   if(e.target.id==='import-file'){ handleImport(e.target.files[0]); return; }
   if(e.target.id==='import-csv-file'){ handleCsvImport(e.target.files[0]); return; }
@@ -1993,7 +2008,7 @@ function onChange(e){
   if(field==='memo'){ ui.form.memo = e.target.value; return; }
   if(field==='timer-memo'){ ui.timerMemo = e.target.value; return; }
   if(field==='subject-edit-name'){ ui.subjectEditor.name = e.target.value; return; }
-  if(field==='deadline-edit-label'){ ui.deadlineEditor.label = e.target.value; return; }
+  if(field==='deadline-edit-label'){ onInput(e); return; }
   if(state.balance && field==='balance-name'){
     // A name is just a label, so a rename applies to every version of that group (it is not a history event).
     const cur = balanceEditing().groups[Number(e.target.dataset.index)];
@@ -2068,9 +2083,15 @@ function exportJson(){
 }
 
 function exportCsv(){
+  // CSV quotes protect delimiters, not spreadsheet formulas. Prefix text only;
+  // keep the original state and exact JSON backup unchanged.
+  const spreadsheetText = value=>{
+    const text = String(value ?? '');
+    return /^(?:[\s\u0000-\u001f]*[=+\-@]|[\t\r\n])/.test(text) ? "'"+text : text;
+  };
   const rows = [['date','subject','minutes','memo']];
   state.records.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(r=>{
-    rows.push([r.date, subjectById(r.subjectId).name, r.minutes, (r.memo||'').replace(/\n/g,' ')]);
+    rows.push([r.date, spreadsheetText(subjectById(r.subjectId).name), r.minutes, spreadsheetText((r.memo||'').replace(/\n/g,' '))]);
   });
   const csv = rows.map(row=>row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   downloadBlob('\uFEFF'+csv, Backup.exportFileName(new Date(), 'csv'), 'text/csv');

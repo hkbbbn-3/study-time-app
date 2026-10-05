@@ -46,6 +46,26 @@ const copy = value=>JSON.parse(JSON.stringify(value));
 const native = goals=>({version:1,subjects:[{id:'s1',name:'数学',color:'#123456'}],
   records:[{id:'r1',date:'2026-02-28',subjectId:'s1',minutes:30,memo:''}],goals});
 
+test('confirmed JSON with crafted fields is rendered inert without changing record references',()=>{
+  const c=app(), payload='"><img src=x onerror="alert(1)">';
+  const data=native({weekday:0,weekend:120});
+  data.subjects[0].id=payload;data.subjects[0].color=payload;
+  data.records[0].subjectId=payload;data.records[0].id=payload;
+  c.handleImport({text:JSON.stringify(data)});c.confirm();
+  assert.equal(c.state.records[0].subjectId,c.state.subjects[0].id);
+  assert.equal(c.state.records[0].minutes,30);
+  c.subjectById=id=>c.state.subjects.find(s=>s.id===id);
+  c.icon=()=>'';c.fmtMin=()=>'';
+  const source=fs.readFileSync(path.join(__dirname,'../script.js'),'utf8');
+  for(const [start,end] of [['function escapeHtml(str){','// ---------- events'],['function recordItemHtml(r){','function timerElapsedMs(']]){
+    vm.runInContext(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))),c);
+  }
+  const html=c.recordItemHtml(c.state.records[0]);
+  assert.doesNotMatch(html,/<img\b/);
+  assert.match(html,/data-id="&quot;&gt;&lt;img/);
+  assert.match(html,/background:#999/);
+});
+
 test('JSON backup round trip preserves zero-minute goals through confirmation', ()=>{
   const c = app();
   const file = Backup.buildBackup({...c.state,goals:{weekday:0,weekend:0}},1);
