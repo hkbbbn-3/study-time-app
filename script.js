@@ -80,6 +80,8 @@ const DESIGN_IDS = DESIGNS.map(d=>d.id);
 
 let ui = {
   tab: 'home',
+  recordMode: 'manual',
+  homeDetails: false,
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth(),
   homeYear: new Date().getFullYear(),
@@ -895,6 +897,16 @@ function renderHome(){
       </div>
     </div>
 
+    <div class="home-record-actions" role="group" aria-label="学習を記録する">
+      <button type="button" class="submit-btn icon-row" data-action="open-record" data-mode="manual">${icon('plus',18)} 時間を記録</button>
+      <button type="button" class="ghost-btn icon-row" data-action="open-record" data-mode="timer">${icon('play',18)} ${state.timer ? 'タイマーへ戻る' : 'タイマー開始'}</button>
+    </div>
+    ${state.timer ? `<div class="card home-timer" role="region" aria-label="タイマーの状態">
+      <div><div class="field-label">${state.timer.confirming ? '保存待ちの記録' : state.timer.running ? '計測中' : '一時停止中'}</div>
+      <strong id="homeTimerDisplay">${state.timer.confirming ? fmtMin(state.timer.finalMinutes) : fmtElapsed(timerElapsedMs())}</strong></div>
+      <button type="button" class="ghost-btn" data-action="open-record" data-mode="timer">タイマーへ戻る</button>
+    </div>` : ''}
+
     ${renderDeadlineHome()}
 
     <div class="section-label">今週</div>
@@ -927,6 +939,9 @@ function renderHome(){
       </div>
     </div>
 
+    <button type="button" class="ghost-btn home-details-toggle icon-row" data-action="toggle-home-details" aria-expanded="${!!ui.homeDetails}" aria-controls="homeDetails">${icon('trending',18)} ${ui.homeDetails ? '詳しい振り返りを閉じる' : '詳しく振り返る'} ${icon(ui.homeDetails ? 'minus' : 'plus',16)}</button>
+    <div id="homeDetails" ${ui.homeDetails ? '' : 'hidden'}>
+    ${ui.homeDetails ? `
     <div class="section-label">今月</div>
     <div class="card">
       <div class="cal-head" style="margin-bottom:var(--sp-3);">
@@ -1001,6 +1016,8 @@ function renderHome(){
         </div>
       </div>
       ${renderRangeBody()}
+    </div>
+    ` : ''}
     </div>
   `;
 }
@@ -1180,11 +1197,13 @@ function fmtElapsed(ms){
   return h>0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 // Ticks the visible timer display directly (no render()) so it doesn't repaint anything else on
-// screen every second — only matters while the record tab is showing the running card.
+// screen every second — updates the running timer on the home or record screen.
 function tickTimerDisplay(){
   if(!state.timer || !state.timer.running || state.timer.confirming) return;
-  const el = document.getElementById('timerDisplay');
-  if(el) el.textContent = fmtElapsed(timerElapsedMs());
+  for(const id of ['timerDisplay','homeTimerDisplay']){
+    const el = document.getElementById(id);
+    if(el) el.textContent = fmtElapsed(timerElapsedMs());
+  }
 }
 
 function renderTimerCard(){
@@ -1247,8 +1266,14 @@ function renderRecord(){
   const dayRecs = recordsOn(f.date);
   const hourOptions = Array.from({length:13}, (_,i)=>i);
   const minOptions = Array.from({length:60}, (_,i)=>i);
+  const manual = ui.recordMode!=='timer';
 
   return `
+    <div class="record-mode-switch" role="group" aria-label="記録方法">
+      <button type="button" data-action="record-mode" data-mode="manual" aria-pressed="${manual}" class="${manual?'active':''}">${icon('edit',17)} 時間入力</button>
+      <button type="button" data-action="record-mode" data-mode="timer" aria-pressed="${!manual}" class="${manual?'':'active'}">${icon('clock',17)} タイマー${state.timer?' •':''}</button>
+    </div>
+    ${manual ? `
     <div class="card" id="recordFormCard">
       <div class="card-title icon-row">${isEditing ? icon('edit',15)+' 記録を編集' : icon('edit',15)+' 時間を入力して記録'}</div>
       ${isEditing ? '' : `<div class="card-desc">勉強した時間を自分で入力します。終わった勉強や、過去の日の記録もOK。</div>`}
@@ -1304,7 +1329,7 @@ function renderRecord(){
       ${isEditing ? `<div class="cancel-link" data-action="cancel-edit">編集をやめる</div>` : ''}
     </div>
 
-    ${renderTimerCard()}
+    ` : renderTimerCard()}
 
     <div class="section-label">${formatDateJp(f.date)}の記録</div>
     ${dayRecs.length ? dayRecs.map(r=>recordItemHtml(r)).join('') : `<div class="card"><div class="empty">まだ記録がありません</div></div>`}
@@ -1595,6 +1620,20 @@ function onClick(e){
   if(!btn) return;
   const action = btn.dataset.action;
 
+  if(action==='open-record' || action==='record-mode'){
+    ui.recordMode = btn.dataset.mode==='timer' ? 'timer' : 'manual';
+    ui.tab = 'record';
+    render();
+    window.scrollTo(0,0);
+    return;
+  }
+  if(action==='toggle-home-details'){
+    ui.homeDetails = !ui.homeDetails;
+    render();
+    const toggle = document.querySelector('[data-action="toggle-home-details"]');
+    if(toggle) toggle.focus({preventScroll:true});
+    return;
+  }
   if(action==='go-tab'){
     ui.tab = btn.dataset.tab;
     ui.editReturnTab = null;
@@ -1645,8 +1684,9 @@ function onClick(e){
   }
   if(action==='goto-record-day'){
     ui.form.date = btn.dataset.date;
+    ui.recordMode = 'manual';
     ui.tab='record';
-    render(); return;
+    render(); window.scrollTo(0,0); return;
   }
   if(action==='submit-record'){
     submitRecord(); return;
@@ -1662,6 +1702,7 @@ function onClick(e){
       ui.form = { date:rec.date, subjectIds:[rec.subjectId], hours:Math.floor(rec.minutes/60), minutes:rec.minutes%60, memo:rec.memo||'', editingId:rec.id };
       // The edit form lives on the 記録 tab: go there (from the calendar too), and come back afterwards.
       ui.editReturnTab = ui.tab!=='record' ? ui.tab : null;
+      ui.recordMode = 'manual';
       ui.tab = 'record';
       render();
       const card = document.getElementById('recordFormCard');
@@ -1990,6 +2031,8 @@ function onClick(e){
 }
 
 function onInput(e){
+  if(e.target.dataset.field==='memo'){ ui.form.memo = e.target.value; return; }
+  if(e.target.dataset.field==='timer-memo'){ ui.timerMemo = e.target.value; return; }
   if(e.target.dataset.field==='deadline-edit-label' && ui.deadlineEditor){
     ui.deadlineEditor.label = e.target.value;
     const btn = document.querySelector('[data-action="save-deadline-edit"]');
