@@ -21,6 +21,7 @@ function app(){
   load(c,'function onClick(e){','function onInput(e){');
   load(c,'function onInput(e){','function onChange(e){');
   load(c,'function renderHome(){','function computeAllTimeStats(){');
+  load(c,'function recordShortcutHistory(){','function renderRecord(){');
   load(c,'function renderRecord(){','function formatDateJp(iso){');
   return c;
 }

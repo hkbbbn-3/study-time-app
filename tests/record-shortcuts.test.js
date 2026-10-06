@@ -1,0 +1,61 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../script.js'),'utf8');
+function app(){
+  const c={state:{subjects:[{id:'a',name:'数学',color:'#fff'},{id:'b',name:'英語',color:'#fff'}],records:[]},
+    ui:{form:{date:'2026-10-01',hours:0,minutes:27,subjectIds:['b'],memo:'入力中',editingId:null}},
+    render:()=>{},isoToday:()=> '2026-10-06',recordsOn:()=>[],icon:()=>'',escapeHtml:s=>s||'',safeColor:()=> '#fff',
+    formatDateFull:()=>'',formatDateJp:()=>'',fmtMin:n=>`${n}分`};
+  vm.createContext(c);
+  for(const [a,b] of [['// ---------- RECORD ----------','function formatDateJp(iso){'],['function onClick(e){','function onInput(e){']]){
+    vm.runInContext(source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a))),c);
+  }
+  return c;
+}
+function click(c,action,data={}){c.onClick({target:{closest:()=>({dataset:{action,...data}})}});}
+test('preset replaces duration without saving or changing the other draft fields',()=>{
+  const c=app();
+  for(const [n,h,m] of [[15,0,15],[30,0,30],[60,1,0]]){
+    click(c,'preset-record-time',{minutes:String(n)});
+    assert.equal(c.ui.form.hours,h); assert.equal(c.ui.form.minutes,m);
+    assert.equal(c.ui.form.memo,'入力中'); assert.equal(c.ui.form.date,'2026-10-01');
+    assert.equal(c.state.records.length,0);
+  }
+});
+test('previous entry uses the last usable saved record, today and the current memo',()=>{
+  const c=app();
+  c.state.records=[{subjectId:'a',minutes:780},{subjectId:'deleted',minutes:30}];
+  click(c,'reuse-last-record');
+  assert.equal(c.ui.form.subjectIds.join(','),'a'); assert.equal(c.ui.form.hours,13);
+  assert.equal(c.ui.form.minutes,0); assert.equal(c.ui.form.date,'2026-10-06');
+  assert.equal(c.ui.form.memo,'入力中'); assert.equal(c.state.records.length,2);
+  assert.match(c.renderRecord(),/<option value="13" selected>/);
+});
+test('recent subjects are unique, omit deleted subjects and show at most three',()=>{
+  const c=app(); c.state.subjects.push({id:'c',name:'国語'},{id:'d',name:'理科'});
+  c.state.records=['a','b','c','deleted','d','b'].map(subjectId=>({subjectId,minutes:27}));
+  const html=c.renderRecord(); const recent=html.match(/<div class="recent-subjects"[^>]*>([\s\S]*?)<\/div>/);
+  assert.ok(recent,'recent subject choices missing');
+  assert.equal([...recent[1].matchAll(/data-id="([^"]*)"/g)].map(m=>m[1]).join(','),'b,d,c');
+});
+test('editing cannot be overwritten by shortcut actions',()=>{
+  const c=app(); c.ui.form.editingId='r'; const before=JSON.stringify(c.ui.form);
+  c.state.records=[{subjectId:'a',minutes:30}];
+  click(c,'preset-record-time',{minutes:'60'}); click(c,'reuse-last-record');
+  assert.equal(JSON.stringify(c.ui.form),before);
+  assert.doesNotMatch(c.renderRecord(),/data-action="(?:reuse-last-record|preset-record-time)"/);
+});
+test('empty history has no previous-entry button and still permits exact minute input',()=>{
+  const c=app(); const html=c.renderRecord();
+  assert.doesNotMatch(html,/data-action="reuse-last-record"/);
+  assert.match(html,/<option value="27" selected>/);
+});
+test('custom time entry clears an outdated preset selection',()=>{
+  const c=app(); const buttons=[15,30,60].map(n=>({dataset:{minutes:String(n)},pressed:'true',setAttribute(k,v){this.pressed=v;}}));
+  c.document={querySelector:()=>null,querySelectorAll:()=>buttons};
+  vm.runInContext(source.slice(source.indexOf('function syncSubmitState(){'),source.indexOf('function submitRecord(){')),c);
+  c.syncSubmitState();
+  assert.equal(buttons.map(b=>b.pressed).join(','),'false,false,false');
+});

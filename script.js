@@ -1260,13 +1260,22 @@ function renderTimerCard(){
 }
 
 // ---------- RECORD ----------
+// Stored order is the order entries were added, including backdated study days.
+function recordShortcutHistory(){
+  return (state.records || []).slice().reverse().filter(r=>
+    r && Number.isSafeInteger(r.minutes) && r.minutes>0 && state.subjects.some(s=>s.id===r.subjectId));
+}
 function renderRecord(){
   const f = ui.form;
   const isEditing = !!f.editingId;
   const dayRecs = recordsOn(f.date);
   const hourOptions = Array.from({length:13}, (_,i)=>i);
+  if(Number.isSafeInteger(f.hours) && f.hours>12) hourOptions.push(f.hours);
   const minOptions = Array.from({length:60}, (_,i)=>i);
   const manual = ui.recordMode!=='timer';
+  const history = isEditing ? [] : recordShortcutHistory();
+  const previous = history[0];
+  const recentIds = [...new Set(history.map(r=>r.subjectId))].slice(0,3);
 
   return `
     <div class="record-mode-switch" role="group" aria-label="記録方法">
@@ -1277,6 +1286,7 @@ function renderRecord(){
     <div class="card" id="recordFormCard">
       <div class="card-title icon-row">${isEditing ? icon('edit',15)+' 記録を編集' : icon('edit',15)+' 時間を入力して記録'}</div>
       ${isEditing ? '' : `<div class="card-desc">勉強した時間を自分で入力します。終わった勉強や、過去の日の記録もOK。</div>`}
+      ${previous ? `<button type="button" class="ghost-btn reuse-record" data-action="reuse-last-record">${icon('edit',16)} 前回の内容を使う <small>${escapeHtml(state.subjects.find(s=>s.id===previous.subjectId).name)}・${fmtMin(previous.minutes)}</small></button>` : ''}
 
       <div class="field">
         <label class="field-label">日付</label>
@@ -1286,6 +1296,12 @@ function renderRecord(){
         </div>
       </div>
 
+      ${recentIds.length ? `<div class="field">
+        <div class="field-label">最近使った科目</div>
+        <div class="recent-subjects" role="group" aria-label="最近使った科目">
+          ${recentIds.map(id=>{ const s=state.subjects.find(s=>s.id===id); const selected=f.subjectIds.includes(id); return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-subject-select" data-id="${escapeHtml(id)}" aria-pressed="${selected}" style="--pc:${safeColor(s.color)};${selected?`background:${safeColor(s.color)};border-color:${safeColor(s.color)};`:''}"><span class="dot" style="background:${selected?'#fff':safeColor(s.color)}"></span>${escapeHtml(s.name)}</button>`; }).join('')}
+        </div>
+      </div>` : ''}
       <div class="field">
         <label class="field-label">科目${isEditing?'':'（複数選択可）'}</label>
         <div class="subject-pill-grid">
@@ -1298,6 +1314,9 @@ function renderRecord(){
         </div>
       </div>
 
+      ${!isEditing ? `<div class="time-presets" role="group" aria-label="学習時間を選ぶ">
+        ${[15,30,60].map(n=>`<button type="button" data-action="preset-record-time" data-minutes="${n}" aria-pressed="${f.hours*60+f.minutes===n}">${n}分</button>`).join('')}
+      </div>` : ''}
       <div class="field-row">
         <div class="field">
           <label class="field-label">時間</label>
@@ -1620,6 +1639,24 @@ function onClick(e){
   if(!btn) return;
   const action = btn.dataset.action;
 
+  if(action==='preset-record-time'){
+    if(ui.form.editingId) return;
+    const minutes=Number(btn.dataset.minutes);
+    if(![15,30,60].includes(minutes)) return;
+    ui.form.hours=Math.floor(minutes/60);
+    ui.form.minutes=minutes%60;
+    render(); return;
+  }
+  if(action==='reuse-last-record'){
+    if(ui.form.editingId) return;
+    const previous=recordShortcutHistory()[0];
+    if(!previous) return;
+    ui.form.subjectIds=[previous.subjectId];
+    ui.form.hours=Math.floor(previous.minutes/60);
+    ui.form.minutes=previous.minutes%60;
+    ui.form.date=isoToday();
+    render(); return;
+  }
   if(action==='open-record' || action==='record-mode'){
     ui.recordMode = btn.dataset.mode==='timer' ? 'timer' : 'manual';
     ui.tab = 'record';
@@ -2073,6 +2110,8 @@ function onChange(e){
 function syncSubmitState(){
   const btn = document.querySelector('[data-action="submit-record"]');
   if(btn) btn.disabled = (ui.form.hours===0 && ui.form.minutes===0) || ui.form.subjectIds.length===0;
+  document.querySelectorAll('[data-action="preset-record-time"]').forEach(button=>
+    button.setAttribute('aria-pressed',String(ui.form.hours*60+ui.form.minutes===Number(button.dataset.minutes))));
 }
 
 function submitRecord(){
