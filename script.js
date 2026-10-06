@@ -215,6 +215,7 @@ function applyTheme(){
   const root = document.documentElement;
   root.classList.toggle('dark', state.theme==='dark');
   root.setAttribute('data-design', state.design);
+  syncSeaVideo();
   loadDesignFont(state.design);
   // keep the browser/PWA status bar colour in step with the page background
   const meta = document.querySelector('meta[name="theme-color"]');
@@ -2578,8 +2579,47 @@ function ensureSeaLayers(){
   el.id = 'seaLayers';
   el.className = 'sea-layers';
   el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = '<div class="sea-gradient"></div><div class="sea-light"></div><div class="sea-particles"></div><div class="sea-life"></div><div class="sea-diver"></div>';
+  el.innerHTML = '<div class="sea-gradient"></div><div class="sea-light"></div><div class="sea-particles"></div><div class="sea-life"></div><div class="sea-diver"><video id="seaVideo" muted loop playsinline preload="none" poster="assets/diver-loop-poster.jpg" src="assets/diver-loop.mp4" tabindex="-1"></video></div>';
   document.body.insertBefore(el, document.body.firstChild);
+  document.getElementById('seaVideo').muted=true;
+  initSeaMotion();
+  document.addEventListener('visibilitychange',syncSeaVideo);
+  window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',syncSeaVideo);
+  syncSeaVideo();
+}
+
+function initSeaMotion(){
+  const layer=document.getElementById('seaLayers');
+  let pointerX=0,pointerY=0,pending=false;
+  const update=()=>{
+    pending=false;
+    const active=state.design==='sea' && !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const range=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
+    const depth=range ? Math.max(0,Math.min(1,window.scrollY/range))*96 : 0;
+    layer.style.setProperty('--diver-x',`${active ? pointerX : 0}px`);
+    layer.style.setProperty('--diver-y',`${active ? depth+pointerY : 0}px`);
+  };
+  const schedule=()=>{if(!pending){pending=true;requestAnimationFrame(update);}};
+  window.addEventListener('scroll',schedule,{passive:true});
+  window.addEventListener('resize',schedule,{passive:true});
+  window.addEventListener('pointermove',e=>{
+    if(e.pointerType!=='mouse' || state.design!=='sea') return;
+    pointerX=Math.max(-1,Math.min(1,e.clientX/window.innerWidth*2-1))*16;
+    pointerY=Math.max(-1,Math.min(1,e.clientY/window.innerHeight*2-1))*12;
+    schedule();
+  },{passive:true});
+  window.addEventListener('pointerout',e=>{if(!e.relatedTarget){pointerX=0;pointerY=0;schedule();}});
+  window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',schedule);
+  update();
+}
+
+function syncSeaVideo(){
+  const video=document.getElementById('seaVideo');
+  if(!video) return;
+  const active=state.design==='sea' && !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(active){
+    if(video.paused) video.play().catch(()=>{});
+  }else if(!video.paused){video.pause();}
 }
 
 // ---------- init ----------

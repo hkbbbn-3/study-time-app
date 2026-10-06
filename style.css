@@ -739,7 +739,14 @@ html[data-design="sea"] .mesh{ display:none; }
 /* Diver mount: sized and parked on the right, where the hero's ring column leaves open water.
    Intended content: one sprite sheet whose frame is chosen by scroll position (steps() on the same
    scroll timeline), never a free-running timer. */
-.sea-diver{ z-index:4; inset:auto 4% 18% auto; width:min(34vw,180px); aspect-ratio:392/282; }
+.sea-layers > .sea-diver{ z-index:4; inset:auto auto 12% 50%; width:min(100vw,640px); aspect-ratio:16/9;
+  transform:translate(calc(-50% + var(--diver-x,0px)),var(--diver-y,0px)); transition:transform .65s ease-out;
+  -webkit-mask-image:radial-gradient(ellipse at center,#000 35%,transparent 72%);
+  mask-image:radial-gradient(ellipse at center,#000 35%,transparent 72%);
+}
+.sea-diver video{display:block; width:100%; height:100%; object-fit:contain;}
+html[data-design="sea"]:not(.dark) .sea-diver{opacity:.18;}
+@media(prefers-reduced-motion:reduce){.sea-layers > .sea-diver{transform:translateX(-50%);transition:none;}}
 @keyframes seaDive{ from{ transform:translateY(0); } to{ transform:translateY(-75%); } }
 @keyframes seaLightFade{ from{ opacity:1; } to{ opacity:0; } }
 @supports (animation-timeline: scroll()){
