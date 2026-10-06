@@ -233,13 +233,58 @@ function loadDesignFont(design){
 
 // ---------- toast ----------
 let toastTimer=null;
-function showToast(msg){
+function showToast(msg, undo){
   let el = document.getElementById('toast');
   if(!el){ el=document.createElement('div'); el.id='toast'; document.body.appendChild(el); }
   el.textContent = msg;
+  el.setAttribute('role','status');
+  if(undo){
+    el.textContent='';
+    const mark=document.createElement('span');
+    mark.className='toast-check'; mark.textContent='✓'; mark.setAttribute('aria-hidden','true');
+    const copy=document.createElement('span'); copy.className='toast-copy';
+    const split=msg.lastIndexOf('。');
+    const title=document.createElement('span'); title.className='toast-title';
+    title.textContent=split<0 ? msg : msg.slice(0,split);
+    copy.appendChild(title);
+    if(split>=0){
+      const detail=document.createElement('span'); detail.className='toast-detail';
+      detail.textContent=msg.slice(split+1); copy.appendChild(detail);
+    }
+    el.appendChild(mark); el.appendChild(copy);
+    const button=document.createElement('button');
+    button.type='button'; button.textContent='取り消す';
+    button.addEventListener('click',undo,{once:true});
+    el.appendChild(button);
+  }
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=> el.classList.remove('show'), 2200);
+  toastTimer = setTimeout(()=> {el.classList.remove('show'); el.textContent='';}, undo ? 10000 : 2200);
+}
+
+function showRecordSaveFeedback(records, before){
+  if(!records.length) return;
+  const saved=records.map(r=>({...r}));
+  const date=saved[0].date;
+  const subject=state.subjects.find(s=>s.id===saved[0].subjectId);
+  const summary=saved.length>1 ? `${saved.length}件の記録を追加` : `${subject ? subject.name : '科目'}${fmtMin(saved[0].minutes)}を${before ? '更新' : '追加'}`;
+  const deadline=Date.now()+10000;
+  showToast(`${summary}。${date===isoToday() ? '今日' : date}の合計${fmtMin(totalOn(date))}`,()=>{
+    if(Date.now()>=deadline) return;
+    // Do not undo records that have since been edited, removed or restored.
+    if(!saved.every(r=>{
+      const current=state.records.find(x=>x.id===r.id);
+      return current && JSON.stringify(current)===JSON.stringify(r);
+    })) {showToast('記録が変更されたため取り消せません');return;}
+    if(before){
+      const index=state.records.findIndex(r=>r.id===before.id);
+      state.records[index]={...before};
+    }else{
+      const ids=new Set(saved.map(r=>r.id));
+      state.records=state.records.filter(r=>!ids.has(r.id));
+    }
+    persist(); render(); showToast('保存を取り消しました');
+  });
 }
 
 // ---------- streak ----------
@@ -1275,7 +1320,6 @@ function renderRecord(){
   const manual = ui.recordMode!=='timer';
   const history = isEditing ? [] : recordShortcutHistory();
   const previous = history[0];
-  const recentIds = [...new Set(history.map(r=>r.subjectId))].slice(0,3);
 
   return `
     <div class="record-mode-switch" role="group" aria-label="記録方法">
@@ -1296,12 +1340,6 @@ function renderRecord(){
         </div>
       </div>
 
-      ${recentIds.length ? `<div class="field">
-        <div class="field-label">最近使った科目</div>
-        <div class="recent-subjects" role="group" aria-label="最近使った科目">
-          ${recentIds.map(id=>{ const s=state.subjects.find(s=>s.id===id); const selected=f.subjectIds.includes(id); return `<button type="button" class="subject-pill ${selected?'selected':''}" data-action="toggle-subject-select" data-id="${escapeHtml(id)}" aria-pressed="${selected}" style="--pc:${safeColor(s.color)};${selected?`background:${safeColor(s.color)};border-color:${safeColor(s.color)};`:''}"><span class="dot" style="background:${selected?'#fff':safeColor(s.color)}"></span>${escapeHtml(s.name)}</button>`; }).join('')}
-        </div>
-      </div>` : ''}
       <div class="field">
         <label class="field-label">科目${isEditing?'':'（複数選択可）'}</label>
         <div class="subject-pill-grid">
@@ -1314,9 +1352,6 @@ function renderRecord(){
         </div>
       </div>
 
-      ${!isEditing ? `<div class="time-presets" role="group" aria-label="学習時間を選ぶ">
-        ${[15,30,60].map(n=>`<button type="button" data-action="preset-record-time" data-minutes="${n}" aria-pressed="${f.hours*60+f.minutes===n}">${n}分</button>`).join('')}
-      </div>` : ''}
       <div class="field-row">
         <div class="field">
           <label class="field-label">時間</label>
@@ -1639,14 +1674,6 @@ function onClick(e){
   if(!btn) return;
   const action = btn.dataset.action;
 
-  if(action==='preset-record-time'){
-    if(ui.form.editingId) return;
-    const minutes=Number(btn.dataset.minutes);
-    if(![15,30,60].includes(minutes)) return;
-    ui.form.hours=Math.floor(minutes/60);
-    ui.form.minutes=minutes%60;
-    render(); return;
-  }
   if(action==='reuse-last-record'){
     if(ui.form.editingId) return;
     const previous=recordShortcutHistory()[0];
@@ -1866,15 +1893,17 @@ function onClick(e){
   if(action==='confirm-timer'){
     const t = state.timer;
     if(!t || !t.confirming) return;
+    const saved=[];
     t.subjectIds.forEach(subjectId=>{
-      state.records.push({ id: uid(), date:t.startDate, subjectId, minutes:t.finalMinutes, memo:ui.timerMemo });
+      const record={ id: uid(), date:t.startDate, subjectId, minutes:t.finalMinutes, memo:ui.timerMemo };
+      state.records.push(record); saved.push(record);
     });
     state.lastMemo = ui.timerMemo;
     state.timer = null;
     persist();
     const goalNowMet = goalFor(t.startDate)>0 && totalOn(t.startDate) >= goalFor(t.startDate);
     render();
-    showToast(t.subjectIds.length>1 ? `${t.subjectIds.length}件の記録をしました` : '記録しました');
+    showRecordSaveFeedback(saved,null);
     if(goalNowMet && t.startDate===isoToday()) launchConfetti();
     return;
   }
@@ -2110,32 +2139,35 @@ function onChange(e){
 function syncSubmitState(){
   const btn = document.querySelector('[data-action="submit-record"]');
   if(btn) btn.disabled = (ui.form.hours===0 && ui.form.minutes===0) || ui.form.subjectIds.length===0;
-  document.querySelectorAll('[data-action="preset-record-time"]').forEach(button=>
-    button.setAttribute('aria-pressed',String(ui.form.hours*60+ui.form.minutes===Number(button.dataset.minutes))));
 }
 
 function submitRecord(){
   const f = ui.form;
   const minutes = f.hours*60 + f.minutes;
   if(minutes<=0 || f.subjectIds.length===0) return;
+  const saved=[];
+  let before=null;
 
   if(f.editingId){
     const rec = state.records.find(r=>r.id===f.editingId);
-    if(rec){ rec.date=f.date; rec.subjectId=f.subjectIds[0]; rec.minutes=minutes; rec.memo=f.memo; }
-    showToast('記録を更新しました');
+    if(!rec) return;
+    before={...rec};
+    rec.date=f.date; rec.subjectId=f.subjectIds[0]; rec.minutes=minutes; rec.memo=f.memo;
+    saved.push(rec);
     if(ui.editReturnTab==='calendar') ui.selectedDate = f.date; // show the edited day
     returnFromEdit();
   } else {
     f.subjectIds.forEach(subjectId=>{
-      state.records.push({ id: uid(), date:f.date, subjectId, minutes, memo:f.memo });
+      const record={ id: uid(), date:f.date, subjectId, minutes, memo:f.memo };
+      state.records.push(record); saved.push(record);
     });
-    showToast(f.subjectIds.length>1 ? `${f.subjectIds.length}件の記録をしました` : '記録しました');
   }
   state.lastMemo = f.memo;
   persist();
   const wasGoalAchieved = goalFor(f.date)>0 && totalOn(f.date) >= goalFor(f.date);
   resetForm(f.date);
   render();
+  showRecordSaveFeedback(saved,before);
   if(wasGoalAchieved && f.date===isoToday()){
     launchConfetti();
   }

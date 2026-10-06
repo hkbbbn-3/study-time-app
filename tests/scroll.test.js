@@ -14,7 +14,7 @@ function app(){
     ui:{tab:'record',form:{editingId:'r1',date:'2026-10-01',subjectIds:['s1'],hours:2,minutes:0,memo:'updated'},editReturnTab:'calendar'},
     TAB_ORDER:['home','calendar','record','settings'],
     icon:()=>'', logomark:()=>'', tabBtn:()=>'', renderPage:()=>'<p>page</p>',
-    bindEvents:()=>{}, focusModal:()=>{}, persist:()=>{}, showToast:()=>{},
+    bindEvents:()=>{}, focusModal:()=>{}, persist:()=>{}, showToast:()=>{},showRecordSaveFeedback:()=>{},
     goalFor:()=>0, totalOn:()=>0, isoToday:()=>'2026-10-05',
     document:{getElementById:id=>id==='canvas'?canvas:content},
     window:{scrollY:450,scrollTo(x,y){this.scrollY=y;}},

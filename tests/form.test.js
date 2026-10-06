@@ -34,7 +34,7 @@ test('27-minute edit persists unchanged through both click and Enter submission'
     const record = {id:'r',date:'2026-10-05',subjectId:'s',minutes:27,memo:''};
     const c = {state:{records:[record]},ui:{tab:'record',form:{editingId:'r',date:record.date,subjectIds:['s'],hours:0,minutes:27,memo:'追記'}},
       document:{querySelector:selector=>({value:selector.includes('hours')?'0':selector.includes('minutes')?'27':'追記'})},
-      showToast:()=>{},persist:()=>{},returnFromEdit:()=>{},resetForm:()=>{},render:()=>{},goalFor:()=>0,totalOn:()=>27,isoToday:()=>record.date};
+      showToast:()=>{},showRecordSaveFeedback:()=>{},persist:()=>{},returnFromEdit:()=>{},resetForm:()=>{},render:()=>{},goalFor:()=>0,totalOn:()=>27,isoToday:()=>record.date};
     load(c,'function submitRecord(){','// After editing a record');
     load(c,'function submitRecordFromKeyboard(){','function onClick(e){');
     if(keyboard) c.submitRecordFromKeyboard(); else c.submitRecord();
