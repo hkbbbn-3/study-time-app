@@ -1,6 +1,6 @@
 // Pure monthly / yearly totals for the home screen's 統計 card. They only read the records they are given
 // (never write to them), so they can be tested with Node: node --test
-// In the browser they are exposed as window.Stats; script.js calls them from there.
+// In the browser they are exposed as window.Stats; the app scripts (view-home.js) call them from there.
 // Dates are 'YYYY-MM-DD' strings, so a month or year is matched by its prefix and no Date maths is needed.
 (function(root){
   const pad2 = n => String(n).padStart(2, '0');

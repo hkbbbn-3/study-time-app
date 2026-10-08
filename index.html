@@ -19,7 +19,7 @@ window.DESIGN_FONTS = {
     document.documentElement.setAttribute('data-design', design);
     if(d.theme==='dark') document.documentElement.classList.add('dark');
   }catch(e){ design = 'calm'; document.documentElement.setAttribute('data-design','calm'); }
-  // Each design's own typeface is fetched only when that design is in use (script.js swaps it on change).
+  // Each design's own typeface is fetched only when that design is in use (app-core.js swaps it on change).
   // Offline or blocked, the design simply falls back to the Zen fonts loaded by style.css.
   var href = window.DESIGN_FONTS[design];
   if(href){ var l=document.createElement('link'); l.rel='stylesheet'; l.id='design-font'; l.href=href; document.head.appendChild(l); }

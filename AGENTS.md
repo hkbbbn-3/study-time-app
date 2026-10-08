@@ -5,10 +5,20 @@ Codex と Claude Code の両方がこのリポジトリを触るので、ルー�
 
 ## 構成
 
-- `index.html` / `script.js`（1つの IIFE）/ `style.css` が本体
-- `backup.js`（バックアップの組み立てと検証）、`range-total.js`（期間集計）は切り出し済み。ブラウザと Node の両方から読める形
+- `index.html` / `style.css` と、次の9つのスクリプトが本体。**`index.html` の `<script>` の順番がそのまま実行順**（元の `script.js` を章ごとに分けたもの）
+  1. `app-core.js` 定数・アイコン・`state`・`ui`・保存・トースト・ストリーク・レベル
+  2. `app-shell.js` 画面の土台（`render()`・タブ・モーダル）
+  3. `view-home.js` ホーム・バランス・統計カード
+  4. `view-calendar.js` カレンダー
+  5. `view-record.js` タイマー・記録フォーム
+  6. `view-settings.js` 設定
+  7. `events.js` クリック・入力・インポート／エクスポート
+  8. `sea-backdrop.js` Service Worker 登録・Deep Sea の背景と動画
+  9. `app-init.js` 起動処理
+- 9つはどれも IIFE ではなく普通の `<script>`。**トップレベルの `function` / `let` / `const` は全ファイルで共有される**ので、名前をかぶらせない（後から読み込まれたほうが上書きする）
+- `backup.js`（バックアップの組み立てと検証）、`range-total.js`（期間集計）、`stats.js`（月・年の統計）は切り出し済み。ブラウザと Node の両方から読める形
 - `sw.js` は Service Worker。通常は network-first、`Range` リクエスト（動画）は別処理
-- `tests/*.test.js` は Node 組み込みのテストランナー
+- `tests/*.test.js` は Node 組み込みのテストランナー。アプリ本体のソースは `tests/helpers/source.js`（`index.html` の読み込み順に連結）経由で読む。`tests/structure.test.js` が、`index.html` と `sw.js` の `ASSETS` の食い違い・読み込み順・名前の重複を検出する
 - データはすべて端末の localStorage（キー `study-app-data`）。サーバーには送らない
 
 ## 動作確認
@@ -30,6 +40,7 @@ Codex と Claude Code の両方がこのリポジトリを触るので、ルー�
 ## Service Worker
 
 - JS / CSS / 画像など `ASSETS` に入れるファイルを増減したら `sw.js` の `CACHE_NAME`（今は `study-time-vNN`）を上げる
+- **スクリプトを新しく足したら3か所をそろえる**: `index.html` の `<script>`（正しい順番で）、`sw.js` の `ASSETS`、`CACHE_NAME`。そろっていないと `tests/structure.test.js` が失敗する。ファイル名を変えたり順番を変えたりしたら、そのテストの `APP_FILES` も更新する
 - network-first なので、上げ忘れてもオンラインなら古いコードは残りにくい。ただしオフライン時の表示に影響する
 
 ## コミット・公開

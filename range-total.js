@@ -1,6 +1,6 @@
 // Pure totals for the home screen's "期間で合計を調べる" card. They only read the records and the balance
 // setup they are given (never write to them), so they can be tested with Node: node --test
-// In the browser they are exposed as window.RangeTotal; script.js calls them from there.
+// In the browser they are exposed as window.RangeTotal; the app scripts (view-*.js, events.js) call them from there.
 (function(root){
   function isoToDate(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d); }
   function dateToISO(d){
