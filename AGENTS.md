@@ -19,6 +19,7 @@ Codex と Claude Code の両方がこのリポジトリを触るので、ルー�
 - `backup.js`（バックアップの組み立てと検証）、`range-total.js`（期間集計）、`stats.js`（月・年の統計）は切り出し済み。ブラウザと Node の両方から読める形
 - `sw.js` は Service Worker。通常は network-first、`Range` リクエスト（動画）は別処理
 - `tests/*.test.js` は Node 組み込みのテストランナー。アプリ本体のソースは `tests/helpers/source.js`（`index.html` の読み込み順に連結）経由で読む。`tests/structure.test.js` が、`index.html` と `sw.js` の `ASSETS` の食い違い・読み込み順・名前の重複を検出する
+- `docs/superpowers/` は Claude Code の作業記録（設計書と実装計画）。Codex は読まなくてよく、従う必要もない。守るべきルールはこのファイルに書いてある
 - データはすべて端末の localStorage（キー `study-app-data`）。サーバーには送らない
 
 ## 動作確認
@@ -41,11 +42,12 @@ Codex と Claude Code の両方がこのリポジトリを触るので、ルー�
 
 - JS / CSS / 画像など `ASSETS` に入れるファイルを増減したら `sw.js` の `CACHE_NAME`（今は `study-time-vNN`）を上げる
 - **スクリプトを新しく足したら3か所をそろえる**: `index.html` の `<script>`（正しい順番で）、`sw.js` の `ASSETS`、`CACHE_NAME`。そろっていないと `tests/structure.test.js` が失敗する。ファイル名を変えたり順番を変えたりしたら、そのテストの `APP_FILES` も更新する
+- **`assets/diver-loop.mp4`（Deep Sea の動画、約1.1MB）は、意図的に `ASSETS` に入れていない。** Deep Sea を使うときだけ読み込み、使い始めてから一度だけキャッシュに入れる（`warmSeaVideoCache`）。`ASSETS` に足すと、使わない人まで毎回ダウンロードすることになる
 - network-first なので、上げ忘れてもオンラインなら古いコードは残りにくい。ただしオフライン時の表示に影響する
 
 ## コミット・公開
 
-- **GitHub への push は、必ずユーザー（なつき）に「送信してもよろしいですか？」と確認し、「はい」をもらってから行う**
+- **GitHub への push は、必ずユーザー（リポジトリのオーナー）に「送信してもよろしいですか？」と確認し、「はい」をもらってから行う**
 - コミットメッセージは英語の命令形、1行目に要約（例: `Fix record editing and deadline input`）
 - 変更ごとにテストを追加または更新し、全テストが通ってからコミットする
 
