@@ -8,3 +8,11 @@ test('offline video serves valid byte ranges and rejects invalid ranges',async()
     const r=await response;assert.equal(r.status,status);assert.deepEqual([...new Uint8Array(await r.arrayBuffer())],expected);
   }
 });
+test('diver video is not precached at install, and is warmed only when Deep Sea is in use',()=>{
+  const sw=fs.readFileSync(require('node:path').join(__dirname,'../sw.js'),'utf8');
+  const assets=sw.slice(sw.indexOf('const ASSETS'),sw.indexOf('];'));
+  assert.ok(!assets.includes('.mp4'),'mp4 must not be in the install-time precache list');
+  const script=fs.readFileSync(require('node:path').join(__dirname,'../script.js'),'utf8');
+  const sync=script.slice(script.indexOf('function syncSeaVideo'));
+  assert.match(sync.slice(0,sync.indexOf('}else')),/if\(active\)\{\s*warmSeaVideoCache\(video\)/);
+});

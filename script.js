@@ -2618,8 +2618,19 @@ function syncSeaVideo(){
   if(!video) return;
   const active=state.design==='sea' && !document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(active){
+    warmSeaVideoCache(video);
     if(video.paused) video.play().catch(()=>{});
   }else if(!video.paused){video.pause();}
+}
+
+// The diver video is not precached by the service worker, so only Deep Sea users download it. Once Deep Sea is
+// in use, fetch it once (a plain GET goes through sw.js's network-first handler, which caches it) so it also plays offline.
+let seaVideoWarmed=false;
+function warmSeaVideoCache(video){
+  if(seaVideoWarmed || typeof caches==='undefined' || typeof navigator==='undefined' || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+  seaVideoWarmed=true;
+  const src=video.currentSrc||video.src;
+  caches.match(src).then(hit=>{if(!hit) return fetch(src);}).catch(()=>{seaVideoWarmed=false;});
 }
 
 // ---------- init ----------

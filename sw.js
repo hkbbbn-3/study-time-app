@@ -1,4 +1,4 @@
-const CACHE_NAME = 'study-time-v35';
+const CACHE_NAME = 'study-time-v36';
 const ASSETS = [
   './',
   './index.html',
@@ -6,7 +6,6 @@ const ASSETS = [
   './backup.js',
   './range-total.js',
   './script.js',
-  './assets/diver-loop.mp4',
   './assets/diver-loop-poster.jpg',
   './manifest.json',
   './icon-192.png',
