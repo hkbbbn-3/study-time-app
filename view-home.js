@@ -530,7 +530,7 @@ function renderStatsCard(ctx){
   if(!isYear){
     const { y, m, isCurrentMonth, daysInMonth, monthTotal, monthGoal, monthPct } = ctx;
     const s = Stats.monthSummary(state.records, y, m);
-    const cmp = Stats.monthComparison(state.records, y, m, isCurrentMonth ? ctx.now.getDate() : daysInMonth);
+    const cmp = Stats.monthComparison(state.records, y, m, isCurrentMonth ? ctx.now.getDate() : undefined);
     const diff = cmp.current - cmp.previous;
     const delta = cmp.current===0 && cmp.previous===0
       ? { cls:'neutral', value:'―' }

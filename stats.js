@@ -42,7 +42,8 @@
 
   // This month through `throughDay` against the previous month through the same day number (clamped when the
   // previous month is shorter), so a month that is still running is not compared with a finished one.
-  function monthComparison(records, year, month, throughDay){
+  // Leave `throughDay` out to compare the two whole months (for a month that is already over).
+  function monthComparison(records, year, month, throughDay = Infinity){
     const prevYear = month === 0 ? year - 1 : year, prevMonth = month === 0 ? 11 : month - 1;
     const through = (y, m, day) => {
       const prefix = monthPrefix(y, m), cap = Math.min(day, daysInMonth(y, m));

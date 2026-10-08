@@ -91,3 +91,8 @@ test('stats functions do not modify the records they are given', () => {
   monthSummary(records, 2026, 9); monthComparison(records, 2026, 9, 31); yearSummary(records, 2026);
   assert.equal(records.length, 8);
 });
+
+test('monthComparison with no throughDay compares the two whole months (a finished month against a longer previous month)', () => {
+  const r = [rec('2026-01-31', 'math', 60), rec('2026-02-28', 'math', 30)];
+  assert.deepEqual(monthComparison(r, 2026, 1), { current: 30, previous: 60 });
+});

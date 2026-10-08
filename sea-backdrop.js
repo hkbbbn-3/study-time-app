@@ -16,7 +16,8 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
 //   .sea-particles  bubbles / marine snow
 //   .sea-life       fish, jellyfish (.sea-slot children)
 //   .sea-diver      the diver
-// Depth is driven purely by CSS (animation-timeline: scroll()), with no scroll listeners — see style.css.
+// The layers drift with scroll through CSS (animation-timeline: scroll(), see style.css). The diver's offset follows
+// scroll and the mouse pointer through initSeaMotion below, which throttles its updates with requestAnimationFrame.
 function ensureSeaLayers(){
   if(document.getElementById('seaLayers')) return;
   const el = document.createElement('div');
@@ -69,9 +70,17 @@ function syncSeaVideo(){
 
 // The diver video is not precached by the service worker, so only Deep Sea users download it. Once Deep Sea is
 // in use, fetch it once (a plain GET goes through sw.js's network-first handler, which caches it) so it also plays offline.
-let seaVideoWarmed=false;
+let seaVideoWarmed=false, seaVideoWaiting=false;
 function warmSeaVideoCache(video){
-  if(seaVideoWarmed || typeof caches==='undefined' || typeof navigator==='undefined' || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+  if(seaVideoWarmed || typeof caches==='undefined' || typeof navigator==='undefined' || !navigator.serviceWorker) return;
+  if(!navigator.serviceWorker.controller){
+    // First visit: the service worker only takes control a moment after it installs, so try again then.
+    if(!seaVideoWaiting){
+      seaVideoWaiting=true;
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{ seaVideoWaiting=false; syncSeaVideo(); },{once:true});
+    }
+    return;
+  }
   seaVideoWarmed=true;
   const src=video.currentSrc||video.src;
   caches.match(src).then(hit=>{if(!hit) return fetch(src);}).catch(()=>{seaVideoWarmed=false;});
