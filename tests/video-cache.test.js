@@ -12,7 +12,7 @@ test('diver video is not precached at install, and is warmed only when Deep Sea 
   const sw=fs.readFileSync(require('node:path').join(__dirname,'../sw.js'),'utf8');
   const assets=sw.slice(sw.indexOf('const ASSETS'),sw.indexOf('];'));
   assert.ok(!assets.includes('.mp4'),'mp4 must not be in the install-time precache list');
-  const script=fs.readFileSync(require('node:path').join(__dirname,'../script.js'),'utf8');
+  const script=require('./helpers/source.js').appSource();
   const sync=script.slice(script.indexOf('function syncSeaVideo'));
   assert.match(sync.slice(0,sync.indexOf('}else')),/if\(active\)\{\s*warmSeaVideoCache\(video\)/);
 });

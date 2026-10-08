@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const source = fs.readFileSync(path.join(__dirname,'../script.js'),'utf8');
+const source = require('./helpers/source.js').appSource();
 function load(c,start,end){
   const a=source.indexOf(start), b=source.indexOf(end,a);
   assert.ok(a>=0 && b>a);

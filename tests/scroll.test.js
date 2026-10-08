@@ -7,7 +7,7 @@ const vm = require('node:vm');
 // Exercise the real render/save flow with an already displaced canvas. Browser
 // layout is not simulated; this checks recovery from a retained internal offset.
 function app(){
-  const source = fs.readFileSync(path.join(__dirname,'../script.js'),'utf8');
+  const source = require('./helpers/source.js').appSource();
   const canvas = {innerHTML:'',scrollTop:180}, content = {innerHTML:''};
   const c = {
     state:{theme:'light',timer:null,records:[{id:'r1',date:'2026-10-01',subjectId:'s1',minutes:60,memo:''}]},

@@ -2,7 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
-const source=fs.readFileSync(require('node:path').join(__dirname,'../script.js'),'utf8');
+const source=require('./helpers/source.js').appSource();
 function app(){
   const c={state:{subjects:[{id:'a',name:'数学',color:'#fff'},{id:'b',name:'英語',color:'#fff'}],records:[]},
     ui:{form:{date:'2026-10-01',hours:0,minutes:27,subjectIds:['b'],memo:'入力中',editingId:null}},

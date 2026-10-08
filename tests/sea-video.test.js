@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
-const source=fs.readFileSync(require('node:path').join(__dirname,'../script.js'),'utf8');
+const source=require('./helpers/source.js').appSource();
 test('sea video plays only when visible and motion is allowed, without restarting',()=>{
   let plays=0,pauses=0;
   const video={paused:true,currentTime:3,play(){plays++;this.paused=false;return Promise.resolve();},pause(){pauses++;this.paused=true;}};

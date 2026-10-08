@@ -8,7 +8,7 @@ const Backup = require('../backup.js');
 // Execute the app's real import and confirmation functions. Only browser I/O is
 // replaced: no files are downloaded and no browser/localStorage data is changed.
 function app(){
-  const source = fs.readFileSync(path.join(__dirname, '../script.js'), 'utf8');
+  const source = require('./helpers/source.js').appSource();
   let id = 0;
   const c = {
     Backup, console:{warn:()=>{}}, SUBJECT_PALETTE:['#123456'],
@@ -56,7 +56,7 @@ test('confirmed JSON with crafted fields is rendered inert without changing reco
   assert.equal(c.state.records[0].minutes,30);
   c.subjectById=id=>c.state.subjects.find(s=>s.id===id);
   c.icon=()=>'';c.fmtMin=()=>'';
-  const source=fs.readFileSync(path.join(__dirname,'../script.js'),'utf8');
+  const source=require('./helpers/source.js').appSource();
   for(const [start,end] of [['function escapeHtml(str){','// ---------- events'],['function recordItemHtml(r){','function timerElapsedMs(']]){
     vm.runInContext(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))),c);
   }

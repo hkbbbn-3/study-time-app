@@ -2,7 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
-const source=fs.readFileSync(require('node:path').join(__dirname,'../script.js'),'utf8');
+const source=require('./helpers/source.js').appSource();
 function app(){
   let now=1000;
   const c={state:{records:[],subjects:[{id:'s',name:'数学'}]},Date:{now:()=>now},

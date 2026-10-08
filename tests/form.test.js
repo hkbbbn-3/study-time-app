@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = fs.readFileSync(require('node:path').join(__dirname,'../script.js'),'utf8');
+const source = require('./helpers/source.js').appSource();
 function load(c,start,end){
   vm.createContext(c);
   vm.runInContext(source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start))),c);
