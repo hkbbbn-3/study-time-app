@@ -19,7 +19,7 @@
 - 元の `script.js` は削除する。`backup.js` / `range-total.js` / `stats.js` は今までどおり先に読み込む
 - `sw.js` の `ASSETS` に新ファイルを全部入れ、`CACHE_NAME`（今は `study-time-v37`）を上げる
 - `.claude/settings.local.json` は触らない
-- コミットはタスクごとにローカルで行う。**push はしない**（なつきの確認後に行う）
+- コミットはタスクごとにローカルで行う。**push はしない**（リポジトリのオーナーの確認後に行う）
 - コミットメッセージは英語の命令形、末尾に `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
 
 ## Review Focus
