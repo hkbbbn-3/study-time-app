@@ -960,6 +960,16 @@ html[data-design="sea"]:not(.dark) .sea-diver{opacity:.18;}
 .wdot{width:5px;height:5px;border-radius:50%;background:var(--color-primary); opacity:0;}
 .wdot.show{opacity:1;}
 .week-compare{margin-top:var(--sp-4); padding-top:var(--sp-4); border-top:1px solid var(--color-line);}
+.stat-tiles{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--sp-3); margin:var(--sp-4) 0;}
+.stat-tiles .alltime-stat .v{font-size:var(--fs-body);}
+.stat-delta.up{color:var(--color-ok);}
+.stat-delta.down{color:var(--color-warn);}
+.stat-delta.neutral{color:var(--color-faint);}
+.stat-bars{display:grid; grid-template-columns:repeat(var(--n),minmax(0,1fr)); gap:var(--sp-2); margin-top:var(--sp-2);}
+.stat-col{min-width:0; text-align:center;}
+.stat-col-label{margin-top:var(--sp-1); font-size:var(--fs-label); color:var(--color-faint); font-weight:600; white-space:nowrap;}
+.stat-col-val{font-size:var(--fs-label); color:var(--color-muted); font-weight:700; overflow-wrap:anywhere;}
+.stat-note{margin:var(--sp-3) 0; font-size:var(--fs-label); color:var(--color-muted); font-weight:600;}
 .month-breakdown{margin-top:var(--sp-4); padding-top:var(--sp-4); border-top:1px solid var(--color-line);}
 
 .progress-row{display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); margin-bottom:var(--sp-2);}

@@ -1,10 +1,11 @@
-const CACHE_NAME = 'study-time-v36';
+const CACHE_NAME = 'study-time-v37';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './backup.js',
   './range-total.js',
+  './stats.js',
   './script.js',
   './assets/diver-loop-poster.jpg',
   './manifest.json',

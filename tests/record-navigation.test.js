@@ -15,12 +15,13 @@ function app(){
     goalFor:()=>120,totalOn:()=>0,computeStreak:()=>0,renderDeadlineHome:()=>'',renderBalanceHome:()=>'',
     computeAllTimeStats:()=>({totalMinutes:0,dayCount:0,firstDateLabel:'―'}),
     computeLevel:()=>({level:1,remain:300,pct:0}),renderRangeBody:()=>'',fmtMin:n=>`${n}分`,fmtMinHtml:n=>`${n}分`,
-    WEEKDAY_LABELS:['月','火','水','木','金','土','日'],timerElapsedMs:()=>65000,fmtElapsed:()=> '1:05'};
+    WEEKDAY_LABELS:['月','火','水','木','金','土','日'],timerElapsedMs:()=>65000,fmtElapsed:()=> '1:05',
+    Stats:require('../stats.js'),subjectById:()=>({name:'s',color:'#000'}),safeColor:s=>s};
   vm.createContext(c);
   load(c,'function dateToISO(d){','function isWeekend(');
   load(c,'function onClick(e){','function onInput(e){');
   load(c,'function onInput(e){','function onChange(e){');
-  load(c,'function renderHome(){','function computeAllTimeStats(){');
+  load(c,'function renderHome(){','function computeAllTimeStats(){'); // includes the 統計 card helpers
   load(c,'function recordShortcutHistory(){','function renderRecord(){');
   load(c,'function renderRecord(){','function formatDateJp(iso){');
   return c;

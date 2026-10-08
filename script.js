@@ -86,6 +86,8 @@ let ui = {
   calMonth: new Date().getMonth(),
   homeYear: new Date().getFullYear(),
   homeMonth: new Date().getMonth(),
+  statsMode: 'month', // 'month' | 'year' for the home 統計 card (the month shown is homeYear/homeMonth)
+  statsYear: new Date().getFullYear(), // the year shown when statsMode is 'year'
   selectedDate: isoToday(),
   form: { date: isoToday(), subjectIds: [], hours: 1, minutes: 0, memo: '', editingId: null },
   timerSubjectIds: [], // subjects picked before pressing start (record tab, timer card)
@@ -900,15 +902,6 @@ function renderHome(){
   }
   const monthPct = monthGoal>0 ? Math.min(100, Math.round((monthTotal/monthGoal)*100)) : 0;
 
-  // subject breakdown this month
-  const bySubject = {};
-  for(let d=1; d<=daysInMonth; d++){
-    const iso = dateToISO(new Date(y,m,d));
-    recordsOn(iso).forEach(r=>{ bySubject[r.subjectId] = (bySubject[r.subjectId]||0) + r.minutes; });
-  }
-  const subjEntries = Object.entries(bySubject).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const maxSubj = subjEntries.length ? subjEntries[0][1] : 1;
-
   const allTime = computeAllTimeStats();
 
   return `
@@ -988,34 +981,8 @@ function renderHome(){
     <button type="button" class="ghost-btn home-details-toggle icon-row" data-action="toggle-home-details" aria-expanded="${!!ui.homeDetails}" aria-controls="homeDetails">${icon('trending',18)} ${ui.homeDetails ? '詳しい振り返りを閉じる' : '詳しく振り返る'} ${icon(ui.homeDetails ? 'minus' : 'plus',16)}</button>
     <div id="homeDetails" ${ui.homeDetails ? '' : 'hidden'}>
     ${ui.homeDetails ? `
-    <div class="section-label">今月</div>
-    <div class="card">
-      <div class="cal-head" style="margin-bottom:var(--sp-3);">
-        <div class="cal-title">${y}年${m+1}月${isCurrentMonth?'（今月）':''}</div>
-        <div class="cal-nav">
-          <div class="iconbtn" data-action="home-prev-month" role="button" tabindex="0" aria-label="前の月">${icon('chevronLeft',16)}</div>
-          <div class="iconbtn" data-action="home-next-month" role="button" tabindex="0" aria-label="次の月">${icon('chevronRight',16)}</div>
-        </div>
-      </div>
-      <div class="progress-row">
-        <div class="t">月の記録</div>
-        <div class="n">${fmtMin(monthTotal)}（目標 ${fmtMin(monthGoal)}）</div>
-      </div>
-      <div class="bar-track"><div class="bar-fill" style="width:${monthPct}%"></div></div>
-      <div class="month-breakdown">
-        <div class="card-title icon-row">${icon('book',15)} 科目ごとの合計（${y}年${m+1}月）</div>
-        ${subjEntries.length ? subjEntries.map(([sid,min])=>{
-          const s = subjectById(sid);
-          const w = Math.round((min/maxSubj)*100);
-          return `<div class="subj-row">
-            <div class="subj-dot" style="background:${safeColor(s.color)}"></div>
-            <div class="subj-name">${escapeHtml(s.name)}</div>
-            <div class="subj-min">${fmtMin(min)}</div>
-          </div>
-          <div class="bar-track" style="height:6px; margin-bottom:2px;"><div class="bar-fill" style="width:${w}%; background:${safeColor(s.color)}"></div></div>`;
-        }).join('') : `<div class="empty">まだ記録がありません<br>「記録」タブから始めてみよう</div>`}
-      </div>
-    </div>
+    <div class="section-label">統計</div>
+    ${renderStatsCard({ y, m, isCurrentMonth, daysInMonth, monthTotal, monthGoal, monthPct, now })}
 
     <div class="section-label">バランス</div>
     ${renderBalanceHome()}
@@ -1066,6 +1033,114 @@ function renderHome(){
     ` : ''}
     </div>
   `;
+}
+
+// ---------- 統計 card (home, inside 詳しく振り返る): month / year totals from stats.js ----------
+// items: [{label, minutes, aria, value?}] drawn as small vertical bars, scaled to the largest one.
+// One-line minutes for narrow spots: 45分 / 4.3h
+function fmtCompact(min){
+  min = Math.round(min);
+  return min<60 ? `${min}分` : `${Math.round(min/6)/10}h`;
+}
+function statBarsHtml(items){
+  const max = Math.max(1, ...items.map(i=>i.minutes));
+  return `<div class="stat-bars" style="--n:${items.length}" role="list">${items.map(i=>{
+    const h = Math.max(4, Math.round((i.minutes/max)*100));
+    return `<div class="stat-col" role="listitem" aria-label="${escapeHtml(i.aria)}">
+      <div class="wbar-track"><div class="wbar-fill" style="height:${i.minutes>0?h:4}%; opacity:${i.minutes>0?1:0.35}"></div></div>
+      <div class="stat-col-label" aria-hidden="true">${escapeHtml(i.label)}</div>
+      ${i.value ? `<div class="stat-col-val" aria-hidden="true">${escapeHtml(i.value)}</div>` : ''}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function statTilesHtml(tiles){
+  return `<div class="stat-tiles">${tiles.map(t=>`<div class="alltime-stat"><div class="v ${t.cls||''}">${t.value}</div><div class="l">${t.label}</div></div>`).join('')}</div>`;
+}
+
+function statSubjectRows(entries, heading){
+  const top = entries.slice(0,5);
+  const max = top.length ? top[0][1] : 1;
+  return `<div class="month-breakdown">
+    <div class="card-title icon-row">${icon('book',15)} ${heading}</div>
+    ${top.length ? top.map(([sid,min])=>{
+      const s = subjectById(sid);
+      const w = Math.round((min/max)*100);
+      return `<div class="subj-row">
+        <div class="subj-dot" style="background:${safeColor(s.color)}"></div>
+        <div class="subj-name">${escapeHtml(s.name)}</div>
+        <div class="subj-min">${fmtMin(min)}</div>
+      </div>
+      <div class="bar-track" style="height:6px; margin-bottom:2px;"><div class="bar-fill" style="width:${w}%; background:${safeColor(s.color)}"></div></div>`;
+    }).join('') : `<div class="empty">まだ記録がありません<br>「記録」タブから始めてみよう</div>`}
+  </div>`;
+}
+
+function renderStatsCard(ctx){
+  const isYear = ui.statsMode==='year';
+  const nowYear = ctx.now.getFullYear();
+  const tabs = `<div class="balance-tabs" role="group" aria-label="統計の期間">
+      <button type="button" class="${isYear?'':'active'}" data-action="stats-mode" data-mode="month" aria-pressed="${!isYear}">月</button>
+      <button type="button" class="${isYear?'active':''}" data-action="stats-mode" data-mode="year" aria-pressed="${isYear}">年</button>
+    </div>`;
+  let head, body;
+  if(!isYear){
+    const { y, m, isCurrentMonth, daysInMonth, monthTotal, monthGoal, monthPct } = ctx;
+    const s = Stats.monthSummary(state.records, y, m);
+    const cmp = Stats.monthComparison(state.records, y, m, isCurrentMonth ? ctx.now.getDate() : daysInMonth);
+    const diff = cmp.current - cmp.previous;
+    const delta = cmp.current===0 && cmp.previous===0
+      ? { cls:'neutral', value:'―' }
+      : { cls: diff>=0 ? 'up' : 'down', value:`${diff>=0?'+':'−'}${fmtCompact(Math.abs(diff))}` };
+    head = `
+      <div class="cal-head" style="margin-bottom:var(--sp-2);">
+        <div class="cal-title">${y}年${m+1}月${isCurrentMonth?'（今月）':''}</div>
+        <div class="cal-nav">
+          <div class="iconbtn" data-action="home-prev-month" role="button" tabindex="0" aria-label="前の月">${icon('chevronLeft',16)}</div>
+          <div class="iconbtn" data-action="home-next-month" role="button" tabindex="0" aria-label="次の月">${icon('chevronRight',16)}</div>
+        </div>
+      </div>`;
+    body = `
+      <div class="progress-row">
+        <div class="t">月の記録</div>
+        <div class="n">${fmtMin(monthTotal)}（目標 ${fmtMin(monthGoal)}）</div>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${monthPct}%"></div></div>
+      ${statTilesHtml([
+        { value:`${s.studyDays}日`, label:'学習した日数' },
+        { value: s.studyDays ? fmtMin(s.avgPerStudyDay) : '―', label:'学習日の平均' },
+        { value: delta.value, cls:`stat-delta ${delta.cls}`, label:'先月比' },
+      ])}
+      ${isCurrentMonth ? `<div class="stat-note">先月比は、先月の同じ日（${ctx.now.getDate()}日）までとの比較です</div>` : ''}
+      <div class="card-title icon-row">${icon('trending',15)} 7日ごとの合計</div>
+      ${statBarsHtml(s.weeks.map(w=>({ label:w.label.replace('日',''), minutes:w.minutes, value: w.minutes>0 ? fmtCompact(w.minutes) : '', aria:`${w.label} ${w.minutes>0?fmtMin(w.minutes):'記録なし'}` })))}
+      ${statSubjectRows(s.bySubject, `科目ごとの合計（${y}年${m+1}月）`)}`;
+  }else{
+    const y = ui.statsYear;
+    const s = Stats.yearSummary(state.records, y);
+    const active = s.months.filter(v=>v>0).length;
+    const best = s.months.reduce((bi,v,i)=> v>s.months[bi] ? i : bi, 0);
+    const atLatest = y>=nowYear;
+    head = `
+      <div class="cal-head" style="margin-bottom:var(--sp-2);">
+        <div class="cal-title">${y}年${y===nowYear?'（今年）':''}</div>
+        <div class="cal-nav">
+          <div class="iconbtn" data-action="stats-prev-year" role="button" tabindex="0" aria-label="前の年">${icon('chevronLeft',16)}</div>
+          <div class="iconbtn ${atLatest?'is-disabled':''}" ${atLatest?'aria-disabled="true"':'data-action="stats-next-year"'} role="button" tabindex="${atLatest?-1:0}" aria-label="次の年">${icon('chevronRight',16)}</div>
+        </div>
+      </div>`;
+    body = `
+      ${statTilesHtml([
+        { value: fmtCompact(s.total), label:'年間の合計' },
+        { value:`${s.studyDays}日`, label:'学習した日数' },
+        { value: active ? fmtCompact(s.total/active) : '―', label:'学習した月の平均' },
+      ])}
+      <div class="card-title icon-row">${icon('trending',15)} 月ごとの合計</div>
+      ${statBarsHtml(s.months.map((v,i)=>({ label:String(i+1), minutes:v, aria:`${i+1}月 ${v>0?fmtMin(v):'記録なし'}` })))}
+      ${s.total>0 ? `<div class="stat-note">いちばん多い月：${best+1}月（${fmtMin(s.months[best])}）</div>` : ''}
+      ${statSubjectRows(s.bySubject, `科目ごとの合計（${y}年）`)}`;
+  }
+  return `<div class="card">${head}${tabs}${body}</div>`;
 }
 
 function computeAllTimeStats(){
@@ -1739,6 +1814,9 @@ function onClick(e){
     ui.homeMonth++; if(ui.homeMonth>11){ ui.homeMonth=0; ui.homeYear++; }
     render(); return;
   }
+  if(action==='stats-mode'){ ui.statsMode = btn.dataset.mode==='year' ? 'year' : 'month'; render(); return; }
+  if(action==='stats-prev-year'){ ui.statsYear--; render(); return; }
+  if(action==='stats-next-year'){ if(ui.statsYear<new Date().getFullYear()){ ui.statsYear++; render(); } return; }
   if(action==='home-prev-week'){ ui.weekOffset--; ui.weekDay = null; render(); return; }
   if(action==='home-next-week'){ if(ui.weekOffset<0) ui.weekOffset++; ui.weekDay = null; render(); return; }
   if(action==='home-this-week'){ ui.weekOffset = 0; ui.weekDay = null; render(); return; }
