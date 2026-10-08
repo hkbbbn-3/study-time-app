@@ -31,7 +31,7 @@ Codex と Claude Code の両方がこのリポジトリを触るので、ルー�
 ## 守ること（過去の事故から）
 
 1. **`render()` は `#canvas` の innerHTML を毎回作り直す。** 常駐させたい要素（Deep Sea の背景・動画など）は `#canvas` の外に置く。中に置くと再生成のたびに消えてちらつく
-2. **blur 系エフェクトは使わない。** 性能が落ちる。スクロール中に style を書き換える処理も、ちらつきの原因になる
+2. **blur 系エフェクトは使わない。** 性能が落ちる。スクロール中に style を書き換える処理も、ちらつきの原因になる。**例外は Deep Sea の潜水士（`sea-backdrop.js` の `initSeaMotion`）だけ。** `requestAnimationFrame` で間引いた CSS 変数の更新で、問題は出ていないので認めている。ほかでスクロール連動の style 更新を新しく足さない
 3. **配色は足さない。** 特に Neon Violet のパレットは変更しない。差別化は Neon Pop 側で行う
 4. **インポートしたデータや記録の文字列は `innerHTML` に生で入れない。** `escapeHtml` / `safeColor` を通すか `textContent` を使う（`tests/security.test.js` が守っている）
 5. **既存の動いている機能を壊さない。** バグ修正と仕様変更は分けて、仕様変更は先に確認する
